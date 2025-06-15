@@ -10,6 +10,10 @@ class DirectMessageFailedError(Exception):
     """Exception raised when a direct message fails to deliver."""
 
 
+class GameSessionError(Exception):
+    """Exception raised when a session is not properly configured."""
+
+
 # Copyright (C) 2025 BBombs
 
 # This program is free software: you can redistribute it and/or modify

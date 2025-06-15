@@ -31,8 +31,8 @@ class DatabaseMember(DatabaseModel):
         """Update this member or add them if not already stored."""
         await self._db.execute(
             """
-            INSERT INTO members (userId, guildId, strikes)
-            VALUES ($1, $2, $3)
+            INSERT INTO members (userId, guildId, rank, wins  loses)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (userId, guildId) DO
             UPDATE SET rank = $3, wins = $4, loses = $5
             """,

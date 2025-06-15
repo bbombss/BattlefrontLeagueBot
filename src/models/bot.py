@@ -78,6 +78,8 @@ class BattleFrontBot(lightbulb.BotApp):
         self._db = Database(self)
         self._miru_client = miru.Client(self)
 
+        self.game_session_count = 0
+
     @property
     def is_started(self) -> bool:
         """A boolean based on whether the bot has started."""

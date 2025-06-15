@@ -324,6 +324,51 @@ class RatingView(miru.View):
         self.stop()
 
 
+class CapsRegisterView(miru.View):
+    """View for prompting users to register for caps."""
+
+    def __init__(
+            self,
+            timeout: float = 600,
+    ) -> None:
+        """View for prompting users to register for caps.
+
+        Parameters
+        ----------
+        timeout : float
+            Timeout for view, defaults to 600.
+
+        """
+        super().__init__(timeout=timeout)
+        self.registered_members: list[hikari.Member] = []
+
+    async def deactivate(self, ctx: miru.ViewContext) -> None:
+        """Deactivate the view by disabling all buttons."""
+        for item in self.children:
+            item.disabled = True
+        await ctx.edit_response(components=self)
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            for item in self.children:
+                item.disabled = True
+            await self.message.edit(components=self)
+        self.stop()
+
+    @miru.button(label="Register", style=hikari.ButtonStyle.PRIMARY)
+    async def confirm_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        if ctx.member in self.registered_members:
+            await ctx.respond("You are already registered for this event.", flags=hikari.MessageFlag.EPHEMERAL)
+            return
+
+        self.registered_members.append(ctx.member)
+        await ctx.respond("Thank you for registering :heart_hands:", flags=hikari.MessageFlag.EPHEMERAL)
+
+        if len(self.registered_members) == 8:
+            await self.deactivate(ctx)
+            self.stop()
+
+
 # Copyright (C) 2025 BBombs
 
 # This program is free software: you can redistribute it and/or modify

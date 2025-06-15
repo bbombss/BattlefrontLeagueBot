@@ -8,6 +8,8 @@ __all__ = [
     "SUCCESS_EMBED_COLOUR",
     "SUCCESS_EMOJI",
     "WARN_EMBED_COLOUR",
+    "TEAM_NAME_KEY_1",
+    "TEAM_NAME_KEY_2"
 ]
 
 import hikari
@@ -23,6 +25,9 @@ LOADING_EMOJI: str = "<a:loading:1220563982499451042>"
 
 INVITE_LINK_TEMPLATE: str = "https://discord.com/oauth2/authorize?client_id={}&permissions=563224831838208&integration_type=0&scope=bot+applications.commands"
 GITHUB_LINK: str = "https://github.com/bbombss/Battlefront2Bot"
+
+TEAM_NAME_KEY_1: list[str] = ['Brown','Great','Black','Red','Wet','Generational','Fearsome','Triumphant','Darth','Old','Adventurous','Ambitious','Amazing','Insane','Charming','Loyal','Fairy','Sexy','Tall','Short','Powerful','Brave','Autistic','Expert','Freaky','Upbeat','Dark','Climactic','Superior','Cheeky','Profit','God','Frametrapping','Mighty','Unchained']
+TEAM_NAME_KEY_2: list[str] = ['Shitters','Princesses','Stallions','Kings','Monkeys','Refrigerators','Knights','Warriors','Challengers','Gerbils','Lions','Tigers','Vaders','Finns','Bears','Lobsters','Rats','Rockets','Power','Law','News','Bathwater','Freaks','Fartsniffers','Blood','Champions','Sons','Dingleberries','Clients','Eagles','Falcons','Dragons','Kangaroos','Aggressors','Stormborns','Targaryens','Lannisters','Skywalkers','Shortkings','Instructors','Avengers','Revengers']
 
 
 # Copyright (C) 2025 BBombs

@@ -4,6 +4,7 @@ from .database_member import *
 from .errors import *
 from .plugin import *
 from .views import *
+from .game_session import *
 
 
 # Copyright (C) 2025 BBombs
