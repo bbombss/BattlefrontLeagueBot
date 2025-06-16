@@ -5,6 +5,18 @@ import hikari.guilds
 import lightbulb
 
 
+def is_admin(member: hikari.Member) -> bool:
+    """Will return true if a member has the administrator permission.
+
+    Parameters
+    ----------
+    member : hikari.Member
+        The member to check.
+
+    """
+    return has_permissions(member, hikari.Permissions(hikari.Permissions.ADMINISTRATOR))
+
+
 def has_permissions(member: hikari.Member, perms: hikari.Permissions, strict: bool = True) -> bool:
     """Will return true if a member has specified permissions.
 

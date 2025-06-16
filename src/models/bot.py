@@ -14,6 +14,7 @@ from src.config import Config
 from src.models.context import *
 from src.models.database import Database
 from src.models.errors import ApplicationStateError
+from src.models.game_session_manager import GameSessionManager
 from src.static import DEFAULT_EMBED_COLOUR
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ class BattleFrontBot(lightbulb.BotApp):
 
         token = config.TOKEN
 
-        default_enabled_guilds = [config.DEBUG_GUILD_ID] if config.DEBUG_MODE and config.DEBUG_GUILD_ID else []
+        default_enabled_guilds = config.DEBUG_GUILD_IDS if config.DEBUG_MODE and config.DEBUG_GUILD_IDS else []
 
         cache_config = hikari.impl.CacheSettings(
             components=hikari.api.CacheComponents.DM_CHANNEL_IDS
@@ -77,8 +78,7 @@ class BattleFrontBot(lightbulb.BotApp):
 
         self._db = Database(self)
         self._miru_client = miru.Client(self)
-
-        self.game_session_count = 0
+        self._game_session_manager = GameSessionManager(self)
 
     @property
     def is_started(self) -> bool:
@@ -128,6 +128,11 @@ class BattleFrontBot(lightbulb.BotApp):
     def miru_client(self) -> miru.Client:
         """The miru client of the bot."""
         return self._miru_client
+
+    @property
+    def game_session_manager(self) -> GameSessionManager:
+        """The game session manager of the bot."""
+        return self._game_session_manager
 
     def run(self) -> None:
         """Start listeners and bot activity."""

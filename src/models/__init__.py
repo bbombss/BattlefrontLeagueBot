@@ -2,9 +2,9 @@ from .bot import *
 from .context import *
 from .database_member import *
 from .errors import *
+from .game_session import *
 from .plugin import *
 from .views import *
-from .game_session import *
 
 
 # Copyright (C) 2025 BBombs

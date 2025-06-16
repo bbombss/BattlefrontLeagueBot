@@ -14,6 +14,9 @@ SELECT schemaVersion FROM databaseSchema
 CREATE TABLE IF NOT EXISTS guilds
 (
     guildId bigint NOT NULL,
+    rank1Role bigint,
+    rank2Role bigint,
+    rank3Role bigint,
     PRIMARY KEY (guildId)
 );
 
