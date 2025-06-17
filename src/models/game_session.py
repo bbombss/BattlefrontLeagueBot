@@ -140,8 +140,107 @@ class SessionContext:
 
         return msg
 
+    async def edit_last_response(self, *args, **kwargs) -> hikari.Message | None:
+        """Edit the last response created for this context.
 
-# ToDo: Move interactions to context
+        Parameters
+        ----------
+        args : Any
+            Arguments passed to the message builder.
+        kwargs : Any
+            Keyword arguments passed to the message builder.
+
+        Returns
+        -------
+        hikari.Message | None
+            The resulting created message or None if there is no previous response.
+
+        """
+        if not self.last_response:
+            return
+
+        msg = await self.last_response.edit(*args, **kwargs)
+        self._last_response = msg
+
+        return msg
+
+    async def wait(self) -> hikari.Message:
+        """Create a response with loading a message."""
+        return await self.respond(f"{LOADING_EMOJI} Waiting for server...")
+
+    async def retry(
+        self, *args, author: hikari.Snowflake | None = None, timeout: float = 60, edit: bool = False, **kwargs
+    ) -> bool:
+        """Create a response for this context.
+
+        Parameters
+        ----------
+        args : Any
+            Arguments passed to the message builder.
+        author : Any
+            An author id, if given only the author can retry, defaults to None.
+        timeout : float
+            Timeout for view, defaults to 60.
+        edit : bool
+            Whether the original response should be edited, defaults to False.
+        kwargs : Any
+            Keyword arguments passed to the message builder.
+
+        Returns
+        -------
+        bool
+            True if the user prompted for retry.
+
+        """
+        view = RetryView(author=author, timeout=timeout)
+
+        if edit:
+            msg = await self.edit_last_response(*args, components=view, **kwargs)
+        else:
+            msg = await self.respond(*args, components=view, **kwargs)
+
+        self._last_response = msg
+        self.app.miru_client.start_view(view, bind_to=msg)
+        await view.wait()
+        return view.value
+
+    async def team_vote(self, timeout: float = 30, edit: bool = False, **kwargs) -> int | None:
+        """Poll players for their team preference and returns the winning vote.
+
+        Parameters
+        ----------
+        timeout : float
+            Timeout for view, defaults to 30.
+        edit : bool
+            Whether the original response should be edited, defaults to False.
+        kwargs : Any
+            Keyword arguments passed to the message builder.
+
+        Returns
+        -------
+        int | None
+            Returns the winning vote or None if there were no votes.
+
+        """
+        view = CapsVotingView(timeout=timeout)
+
+        if edit:
+            msg = await self.edit_last_response("", components=view, **kwargs)
+        else:
+            msg = await self.respond(components=view, **kwargs)
+
+        self._last_response = msg
+        self.app.miru_client.start_view(view, bind_to=msg)
+        await view.wait()
+
+        if len(view.votes) < 1:
+            return
+
+        vote_counts = Counter(view.votes.values())
+        winner_vote, winner_count = vote_counts.most_common(1)[0]
+        return winner_vote
+
+
 class GameSession:
     """Session object that is used to track game progress and stats."""
 
@@ -210,7 +309,7 @@ class GameSession:
             A GamePlayer object that corresponds the member.
 
         """
-        rank_role: int
+        rank_role: int | None = None
 
         for role in member.role_ids:
             if role == self.rank_roles["1"]:
@@ -223,11 +322,11 @@ class GameSession:
                 rank_role = 3
                 break
 
-        if rank_role is None:
+        if not rank_role:
             raise GameSessionError(f"Member {member.display_name} does not have rank role")
 
         game_player = GamePlayer(member, member.display_name, rank_role)
-        self.ctx.app.game_session_manager.game_player_cache.set(member.id, game_player)
+        self.ctx.app.game_session_manager.player_cache.set(member.id, game_player)
         return game_player
 
     async def _get_players(self, members: list[hikari.Member]) -> None:
@@ -242,7 +341,7 @@ class GameSession:
         players: list[GamePlayer] = []
 
         for member in members:
-            cache_result = self._session_manager.game_player_cache.get(member.id)
+            cache_result = self._session_manager.player_cache.get(member.id)
             if cache_result:
                 players.append(cache_result)
                 continue
@@ -306,8 +405,7 @@ class GameSession:
 
         return teams
 
-    # ToDo: Split up/ move interactions to context
-    async def _start_matchmaking_voting(self, matches: list[list[GameTeam]]) -> list[GameTeam] | None:
+    async def _do_matchmaking_voting(self, matches: list[list[GameTeam]]) -> list[GameTeam] | None:
         """Start player voting to determine a match.
 
         Parameters
@@ -318,61 +416,44 @@ class GameSession:
         Returns
         -------
         list[GameTeam] | None
-            The winning GameTeam or None if no game team is voted for.
+            The winning GameTeams or None if no game team is voted for.
 
         """
-        embed = hikari.Embed(
-            title="Team Voting", description="Vote for your team now below :point_down:", colour=DEFAULT_EMBED_COLOUR
-        )
-
-        for i, match in enumerate(matches, 1):
-            embed.add_field(
-                name=f"Teams {i}",
-                value=f"**{match[0].name}** - vs - **{match[1].name}**\n"
-                f"{match[0].players[0].name} ({match[0].players[0].role}) - - "
-                f"{match[1].players[0].name} ({match[1].players[0].role})\n"
-                f"{match[0].players[1].name} ({match[0].players[1].role}) - - "
-                f"{match[1].players[1].name} ({match[1].players[1].role})\n"
-                f"{match[0].players[2].name} ({match[0].players[2].role}) - - "
-                f"{match[1].players[2].name} ({match[1].players[2].role})\n"
-                f"{match[0].players[3].name} ({match[0].players[3].role}) - - "
-                f"{match[1].players[3].name} ({match[1].players[3].role})",
-                inline=False,
+        await self.ctx.wait()
+        while True:  # lol
+            embed = hikari.Embed(
+                title="Team Voting",
+                description="Vote for your team now below :point_down:",
+                colour=DEFAULT_EMBED_COLOUR,
             )
-        embed.set_footer("Waiting for votes... (30sec)")
 
-        view = CapsVotingView()
+            for i, match in enumerate(matches, 1):
+                embed.add_field(
+                    name=f"Teams {i}",
+                    value=f"**{match[0].name}** - vs - **{match[1].name}**\n"
+                    f"{match[0].players[0].name} ({match[0].players[0].role}) - - "
+                    f"{match[1].players[0].name} ({match[1].players[0].role})\n"
+                    f"{match[0].players[1].name} ({match[0].players[1].role}) - - "
+                    f"{match[1].players[1].name} ({match[1].players[1].role})\n"
+                    f"{match[0].players[2].name} ({match[0].players[2].role}) - - "
+                    f"{match[1].players[2].name} ({match[1].players[2].role})\n"
+                    f"{match[0].players[3].name} ({match[0].players[3].role}) - - "
+                    f"{match[1].players[3].name} ({match[1].players[3].role})",
+                    inline=False,
+                )
+            embed.set_footer("Waiting for votes... (30sec)")
 
-        msg = await self.ctx.respond(embed=embed, components=view)
+            winner_vote = await self.ctx.team_vote(edit=True, embed=embed)
 
-        self.ctx.app.miru_client.start_view(view, bind_to=msg)
-        await view.wait()
+            if not winner_vote:
+                embed = hikari.Embed(description=f"{FAIL_EMOJI} **No-one voted for a team**", colour=FAIL_EMBED_COLOUR)
 
-        if len(view.votes) < 1:
-            return
+                if await self.ctx.retry(author=self.ctx.author.id, edit=True, embed=embed):
+                    continue
 
-        vote_counts = Counter(view.votes.values())
-        winner_vote, winner_count = vote_counts.most_common(1)[0]
+                return
 
-        winning_match = matches[winner_vote - 1]
-
-        embed = hikari.Embed(
-            title="Matchmaking complete",
-            description=f"**{winning_match[0].name}** (Rank {winning_match[0].skill}) vs "
-            f"**{winning_match[1].name}** (Rank {winning_match[1].skill})",
-            colour=DEFAULT_EMBED_COLOUR,
-        )
-        embed.add_field(
-            name=winning_match[0].name, value="\n".join(player.name for player in winning_match[0].players), inline=True
-        )
-        embed.add_field(
-            name=winning_match[1].name, value="\n".join(player.name for player in winning_match[1].players), inline=True
-        )
-        embed.set_footer(f"Team {winner_vote} won with {winner_count} votes")
-
-        await self.ctx.last_response.edit(embed=embed, components=[])
-
-        return winning_match
+            return matches[winner_vote - 1]
 
     async def start(self, members: list[hikari.Member]) -> None:
         """Start this session and listening for interactions.
@@ -392,18 +473,26 @@ class GameSession:
         await self._get_players(members)
 
         proposed_matches = self._generate_team_pairs()
-        teams = await self._start_matchmaking_voting(proposed_matches)
+        winning_match = await self._do_matchmaking_voting(proposed_matches)
 
-        if not teams:
-            embed = hikari.Embed(description=f"{FAIL_EMOJI} **No-one voted for a team**", colour=FAIL_EMBED_COLOUR)
-            view = RetryView(self.ctx.author.id)
-            msg = await self.ctx.last_response.edit(embed=embed, components=view)
+        if not winning_match:
+            return
 
-            self.ctx.app.miru_client.start_view(view, bind_to=msg)
-            await view.wait()
+        embed = hikari.Embed(
+            title="Matchmaking complete",
+            description=f"**{winning_match[0].name}** (Rank {winning_match[0].skill}) vs "
+            f"**{winning_match[1].name}** (Rank {winning_match[1].skill})",
+            colour=DEFAULT_EMBED_COLOUR,
+        )
+        embed.add_field(
+            name=winning_match[0].name, value="\n".join(player.name for player in winning_match[0].players), inline=True
+        )
+        embed.add_field(
+            name=winning_match[1].name, value="\n".join(player.name for player in winning_match[1].players), inline=True
+        )
+        embed.set_footer("Waiting for match score...")
 
-            if not view.value:
-                return
+        await self.ctx.edit_last_response(embed=embed, components=[])
 
         ...  # ToDo
 

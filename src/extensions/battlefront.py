@@ -32,56 +32,56 @@ def get_fake_members() -> list[Fakemember]:
             1,
             "fake1",
             [
-                1384163685542531204,
+                1384108414937993338,
             ],
         ),
         Fakemember(
             2,
             "fake2",
             [
-                1384163837699297321,
+                1384108414937993338,
             ],
         ),
         Fakemember(
             3,
             "fake3",
             [
-                1384163685542531204,
+                1384108414937993338,
             ],
         ),
         Fakemember(
             4,
             "fake4",
             [
-                1384163685542531204,
+                1384108482516488343,
             ],
         ),
         Fakemember(
             5,
             "fake5",
             [
-                1384163837699297321,
+                1384108482516488343,
             ],
         ),
         Fakemember(
             6,
             "fake6",
             [
-                1384163837699297321,
+                1384108535478095883,
             ],
         ),
         Fakemember(
             7,
             "fake7",
             [
-                1384163904967675914,
+                1384108535478095883,
             ],
         ),
         Fakemember(
             8,
             "fake8",
             [
-                1384163904967675914,
+                1384108535478095883,
             ],
         ),
     ]
@@ -147,6 +147,12 @@ async def bot_info(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None:
     if len(view.registered_members) < 8:
         await message.edit(
             embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
+            components=[],
+        )
+        return
+    elif len(view.registered_members) > 8:
+        await message.edit(
+            embed=hikari.Embed(description=f"{FAIL_EMOJI} **Too many players registered**", colour=FAIL_EMBED_COLOUR),
             components=[],
         )
         return
