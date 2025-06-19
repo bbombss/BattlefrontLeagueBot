@@ -10,7 +10,7 @@ if t.TYPE_CHECKING:
     from src.models.bot import BattleFrontBot
 
 
-class GamePlayerCache:
+class PlayerCache:
     """Cache of GamePlayer objects for members."""
 
     def __init__(self):
@@ -36,9 +36,9 @@ class GameSessionManager:
 
         """
         self._app = app
-        self._sessions: dict[hikari.Guild, GameSession] = {}
-        self._player_cache = GamePlayerCache()
-        self.session_count = 0
+        self._sessions: dict[hikari.Snowflake, GameSession] = {}
+        self._player_cache = PlayerCache()
+        self._session_count = 0
 
     @property
     def app(self) -> BattleFrontBot:
@@ -46,31 +46,41 @@ class GameSessionManager:
         return self._app
 
     @property
-    def player_cache(self) -> GamePlayerCache:
+    def player_cache(self) -> PlayerCache:
         """The GamePlayer cache."""
         return self._player_cache
 
-    async def bind(self, guild: hikari.Guild, session: GameSession) -> None:
-        """Bind this session to its guild.
+    @property
+    def session_count(self) -> int:
+        """The number of unique sessions that have been active."""
+        return self._session_count
+
+    async def start_session(
+        self, guild_id: hikari.Snowflake, session: GameSession, members: list[hikari.Member]
+    ) -> None:
+        """Start a session.
 
         Parameters
         ----------
-        guild : hikari.Guild
-            The guild this session is to be bound to.
+        guild_id : hikari.Snowflake
+            The guild id this session is to be bound to.
         session : GameSession
-            The game session that is being bound
+            The game session that is being started.
+        members : list[hikari.Member]
+            A list of members that belong to this session (i.e. members).
 
         """
-        self._sessions[guild] = session
-        self.session_count += 1
+        self._sessions[guild_id] = session
+        self._session_count += 1
+        await self._sessions[guild_id].start(members)
 
-    def fetch_session(self, guild: hikari.Guild) -> GameSession | None:
+    def fetch_session(self, guild_id: hikari.Snowflake) -> GameSession | None:
         """Fetch a session from a guild, returns none if this guild has no session.
 
         Parameters
         ----------
-        guild : hikari.Guild
-            The guild for the session that is being fetched is bound to.
+        guild_id : hikari.Snowflake
+            The guild id for the session that is being fetched is bound to.
 
         Returns
         -------
@@ -78,7 +88,36 @@ class GameSessionManager:
             The game session or None if no game session is bound to this guild.
 
         """
-        return self._sessions[guild]
+        return self._sessions.get(guild_id)
+
+    def add_session_score(self, guild_id: hikari.Snowflake, score1: int, score2: int) -> None:
+        """Add game results to a session.
+
+        Parameters
+        ----------
+        guild_id : hikari.Snowflake
+            The guild id for the session that is being updated is bound to.
+        score1 : int
+            The score for the first team.
+        score2 : int
+            The score for the second team.
+
+        """
+        session = self.fetch_session(guild_id)
+        session.add_score(score1, score2)
+        session.event.set()
+
+    def end_session(self, guild_id: hikari.Snowflake) -> None:
+        """End an ongoing session.
+
+        Parameters
+        ----------
+        guild_id : hikari.Snowflake
+            The guild id for the session that is being ended is bound to.
+
+        """
+        self.fetch_session(guild_id).end()
+        self._sessions.pop(guild_id)
 
 
 # Copyright (C) 2025 BBombs

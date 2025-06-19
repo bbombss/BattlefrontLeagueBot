@@ -88,10 +88,10 @@ def get_fake_members() -> list[Fakemember]:
 
 
 @battlefront.command
-@lightbulb.option("greencaps", "The role for green caps.", type=hikari.Role, required=True)
-@lightbulb.option("yellowcaps", "The role for yellow caps.", type=hikari.Role, required=True)
-@lightbulb.option("redcaps", "The role for red caps.", type=hikari.Role, required=True)
-@lightbulb.command("setroles", description="Set the roles that determine player rank.", pass_options=True)
+@lightbulb.option("greencaps", "The role for green caps", type=hikari.Role, required=True)
+@lightbulb.option("yellowcaps", "The role for yellow caps", type=hikari.Role, required=True)
+@lightbulb.option("redcaps", "The role for red caps", type=hikari.Role, required=True)
+@lightbulb.command("roles", description="Set the roles that determine player rank", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def set_roles(
     ctx: BattlefrontBotSlashContext, greencaps: hikari.Role, yellowcaps: hikari.Role, redcaps: hikari.Role
@@ -119,9 +119,13 @@ async def set_roles(
 
 @battlefront.command
 @lightbulb.option("timeout", "How long the bot should wait for 8 players", type=int, required=False)
-@lightbulb.command("startcaps", description="Starts caps.", pass_options=True)
+@lightbulb.command("start", description="Starts a game session", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
-async def bot_info(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None:
+async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None:
+    if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
+        await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)
+        return
+
     record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
     assert record is not None
     if record["rank1role"] is None or record["rank2role"] is None or record["rank3role"] is None:
@@ -144,6 +148,7 @@ async def bot_info(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None:
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
 
+    view.registered_members = get_fake_members()
     if len(view.registered_members) < 8:
         await message.edit(
             embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
@@ -157,7 +162,7 @@ async def bot_info(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None:
         )
         return
 
-    embed = hikari.Embed(description=f"{SUCCESS_EMOJI} **Registration complete**", colour=DEFAULT_EMBED_COLOUR)
+    embed = hikari.Embed(description=f"{SUCCESS_EMOJI} **Registration Complete**", colour=DEFAULT_EMBED_COLOUR)
     embed.add_field(name="Participants:", value="\n".join([user.display_name for user in view.registered_members]))
     embed.set_footer("Starting session...")
 
@@ -169,7 +174,41 @@ async def bot_info(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None:
     embed.set_footer(f"Session: {ctx.app.game_session_manager.session_count + 1}")
     await message.edit(embed=embed)
 
-    await session.start(view.registered_members)
+    await ctx.app.game_session_manager.start_session(ctx.guild_id, session, view.registered_members)
+
+
+@battlefront.command
+@lightbulb.option("team2score", "The score for team 2", type=int, required=True)
+@lightbulb.option("team1score", "The score for team 1", type=int, required=True)
+@lightbulb.command("score", description="Add a score to an ongoing session.", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def capsresult(ctx: BattlefrontBotSlashContext, team1score: int, team2score: int) -> None:
+    session = ctx.app.game_session_manager.fetch_session(ctx.guild_id)
+    if not session or not session.session_task:
+        await ctx.respond_with_failure("**Could not find a game session for this server**", ephemeral=True)
+        return
+    if session.ctx.author.id != ctx.author.id:
+        await ctx.respond_with_failure("**You cannot add a score to this session**", ephemeral=True)
+        return
+
+    ctx.app.game_session_manager.add_session_score(ctx.guild_id, team1score, team2score)
+    await ctx.respond_with_success("**Added score to session successfully**", ephemeral=True)
+
+
+@battlefront.command
+@lightbulb.command("end", description="Stops an ongoing session")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def endsession(ctx: BattlefrontBotSlashContext) -> None:
+    session = ctx.app.game_session_manager.fetch_session(ctx.guild_id)
+    if not session or not session.session_task:
+        await ctx.respond_with_failure("**Could not find a game session for this server**", ephemeral=True)
+        return
+    if session.ctx.author.id != ctx.author.id:
+        await ctx.respond_with_failure("**You cannot end this session**", ephemeral=True)
+        return
+
+    ctx.app.game_session_manager.end_session(ctx.guild_id)
+    await ctx.respond_with_success("**Ended session successfully**", ephemeral=True)
 
 
 def load(bot: BattleFrontBot) -> None:

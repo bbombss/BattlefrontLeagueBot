@@ -4,10 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Session object progress and session manager (Passed)">
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Session context updates and structure improvements (Passed)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/game_session_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session_manager.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -111,7 +112,15 @@
       <option name="project" value="LOCAL" />
       <updated>1750090262697</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Session context updates and structure improvements (Passed)">
+      <option name="closed" value="true" />
+      <created>1750175529735</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1750175529735</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -129,6 +138,7 @@
     <MESSAGE value="Initial commit, main bot components" />
     <MESSAGE value="Session object added, ext in progress (untested/ failed)" />
     <MESSAGE value="Session object progress and session manager (Passed)" />
-    <option name="LAST_COMMIT_MESSAGE" value="Session object progress and session manager (Passed)" />
+    <MESSAGE value="Session context updates and structure improvements (Passed)" />
+    <option name="LAST_COMMIT_MESSAGE" value="Session context updates and structure improvements (Passed)" />
   </component>
 </project>
