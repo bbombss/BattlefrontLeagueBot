@@ -13,7 +13,6 @@ import hikari
 if t.TYPE_CHECKING:
     from src.models.bot import BattleFrontBot
 
-from src.models.database_member import DatabaseMember
 from src.models.errors import *
 from src.models.views import CapsVotingView, RetryView
 from src.static import *
@@ -91,6 +90,8 @@ class GameMatch:
         self.round2_winner: GameTeam | None = None
         self.round1_scores: list[int] | None = None
         self.round2_scores: list[int] | None = None
+        self.winner: GameTeam | None = None
+        self.final_scores: list[int] | None = None
 
 
 class SessionContext:
@@ -227,7 +228,7 @@ class SessionContext:
         await view.wait()
         return view.value
 
-    async def team_vote(self, timeout: float = 30, edit: bool = False, **kwargs) -> int | None:
+    async def team_vote(self, timeout: float = 300, edit: bool = False, **kwargs) -> int | None:
         """Poll players for their team preference and returns the winning vote.
 
         Parameters
@@ -242,10 +243,10 @@ class SessionContext:
         Returns
         -------
         int | None
-            Returns the winning vote or None if there were no votes.
+            Returns the winning vote or None if there were no votes and 5 for a reset.
 
         """
-        view = CapsVotingView(timeout=timeout)
+        view = CapsVotingView(author=self.author.id, timeout=timeout)
 
         if edit:
             msg = await self.edit_last_response("", components=view, **kwargs)
@@ -263,7 +264,75 @@ class SessionContext:
         winner_vote, winner_count = vote_counts.most_common(1)[0]
         return winner_vote
 
+    async def update_round(self, round_no: int, match: GameMatch) -> hikari.Message:
+        """Updates the round information embed with the latest round information.
 
+        Parameters
+        ----------
+        round_no : int
+            The round number.
+        match : GameMatch
+            The game match with the latest information.
+
+        Returns
+        -------
+        hikari.Message | None
+            The resulting created message.
+
+        """
+        sides = ["Light", "Dark"]
+
+        if round_no == 3:
+            win_title = (f"{match.winner.name} Wins: {match.final_scores[0]} - {match.final_scores[1]}"
+                         if match.final_scores[0] != match.final_scores[1] else "Teams Tied")
+            win_desc = f"{match.team1.name} ({match.final_scores[0]}) vs {match.team2.name} ({match.final_scores[1]})"
+
+        embed = hikari.Embed(
+            title=f"Round {round_no}" if round_no < 3 else win_title,
+            description=f"**{match.team1.name}** (Rank {match.team1.skill}) vs "
+                        f"**{match.team2.name}** (Rank {match.team2.skill})" if round_no < 3 else win_desc,
+            colour=DEFAULT_EMBED_COLOUR
+        )
+        embed.add_field(
+            name=f"{match.team1.name}{f" ({sides[0] if round_no == 1 else sides[1]} Side)" if round_no < 3 else ""}",
+            value="\n".join(player.name for player in match.team1.players),
+            inline=True,
+        )
+        embed.add_field(
+            name=f"{match.team2.name}{f" ({sides[1] if round_no == 1 else sides[0]} Side)" if round_no < 3 else ""}",
+            value="\n".join(player.name for player in match.team2.players),
+            inline=True,
+        )
+        embed.set_footer("Waiting for scores..." if round_no < 3 else "Session finished")
+
+        if match.round1_winner:
+            if match.round1_scores[0] == match.round1_scores[1]:
+                winning_msg = "Teams Tied"
+            else:
+                winning_msg = f"{match.round1_winner.name} Wins"
+
+            embed.add_field(
+                name=f"Round 1",
+                value=f"**{winning_msg}**\n{match.round1_scores[0]} - {match.round1_scores[1]}",
+                inline=False
+            )
+
+        if match.round2_winner:
+            if match.round2_scores[0] == match.round2_scores[1]:
+                winning_msg = "Teams Tied"
+            else:
+                winning_msg = f"{match.round2_winner.name} Wins"
+
+            embed.add_field(
+                name=f"Round 2",
+                value=f"**{winning_msg}**\n{match.round2_scores[0]} - {match.round2_scores[1]}",
+                inline=False
+            )
+
+        return await self.edit_last_response("", embed=embed, components=[])
+
+
+# ToDo: Proper session management for ending
 class GameSession:
     """Session object that is used to track game progress and stats."""
 
@@ -359,6 +428,7 @@ class GameSession:
                 break
 
         if not rank_role:
+            self._session_manager._sessions.pop(self.ctx.guild.id)
             raise GameSessionError(f"Member {member.display_name} does not have rank role")
 
         game_player = GamePlayer(member, member.display_name, rank_role)
@@ -387,12 +457,12 @@ class GameSession:
         self._players = players
 
     def _generate_team_pairs(self) -> list[GameMatch]:
-        """Generate 4 GameMatches with GameTeams where the total skill level of each team is as close as possible.
+        """Generate all possible GameMatches where the total skill level of each team is ordered.
 
         Returns
         -------
         list[GameMatch]
-            A list of 4 GameMatches with team pairs.
+            A list of GameMatches with team pairs.
 
         """
         assert self.players is not None
@@ -423,12 +493,12 @@ class GameSession:
 
         # Sorts the results by team skill diff and takes top four (least diff)
         results.sort(key=lambda r: r["difference"])
-        top_four_teams = results[:4]
+        # top_four_teams = results[:4]
 
         teams = []
 
         # Creates pairs of GameTeams
-        for team_pair in top_four_teams:
+        for team_pair in results:
             team1, team2 = team_pair["teams"]
 
             team_a_players = [self.players[i] for i in team1]
@@ -456,10 +526,11 @@ class GameSession:
 
         """
         await self.ctx.wait()
-        i = 0
+        iter = 0
+        matches_groups = [matches[:4], matches[4:8], matches[8:12]]
 
         while True:  # lol
-            i += 1
+            iter += 1
 
             embed = hikari.Embed(
                 title="Team Voting",
@@ -467,9 +538,9 @@ class GameSession:
                 colour=DEFAULT_EMBED_COLOUR,
             )
 
-            for i, match in enumerate(matches, 1):
+            for i, match in enumerate(matches_groups[iter-1], 1):
                 embed.add_field(
-                    name=f"Teams {i}",
+                    name=f"Team {i}",
                     value=f"**{match.team1.name}** - vs - **{match.team2.name}**\n"
                     f"{match.team1.players[0].name} ({match.team1.players[0].role}) - - "
                     f"{match.team2.players[0].name} ({match.team2.players[0].role})\n"
@@ -481,25 +552,31 @@ class GameSession:
                     f"{match.team2.players[3].name} ({match.team2.players[3].role})",
                     inline=False,
                 )
-            embed.set_footer("Waiting for votes... (30sec)")
+            embed.set_footer("Waiting for votes... (5min)")
 
             winner_vote = await self.ctx.team_vote(edit=True, embed=embed)
 
             if not winner_vote:
+                self._session_manager._sessions.pop(self.ctx.guild.id)
                 embed = hikari.Embed(description=f"{FAIL_EMOJI} **No-one voted for a team**", colour=FAIL_EMBED_COLOUR)
 
-                if i > 5:
+                if iter > 5:
                     await self.ctx.edit_last_response(embed=embed, components=[])
                     return
 
                 if await self.ctx.retry(author=self.ctx.author.id, edit=True, embed=embed):
+                    self._session_manager._sessions[self.ctx.guild.id] = self
                     continue
 
                 return
 
-            return matches[winner_vote - 1]
+            if winner_vote == 5:
+                if iter > 3:
+                    return  # ToDo
+                continue
 
-    # ToDo: Fix this garbage + timeout
+            return matches[((winner_vote + (4 * (iter - 1))) - 1)]
+
     async def _wait_for_scores(self) -> None:
         """Start the game loop waiting for scores.
 
@@ -507,120 +584,84 @@ class GameSession:
         """
         team1, team2 = self._match.team1, self._match.team2
         team1_score, team2_score = 0, 0
-        team1_side, team2_side = "Light", "hDark"
-        round: int = 0
-        winning_team: GameTeam
-        winning_msg: str
+        round_no: int = 0
+        timeout: bool = False
 
+        # Update loop for scores
         while self.session_task:
-            round += 1
+            round_no += 1
 
-            if round == 3:
+            if round_no == 3:
                 self._session_task = None
                 break
 
-            embed = hikari.Embed(
-                title=f"Round {round}",
-                description=f"**{team1.name}** (Rank {team1.skill}) vs **{team2.name}** (Rank {team2.skill})",
-                colour=DEFAULT_EMBED_COLOUR,
-            )
-            embed.add_field(
-                name=f"{team1.name} ({team1_side} Side)",
-                value="\n".join(player.name for player in team1.players),
-                inline=True,
-            )
-            embed.add_field(
-                name=f"{team2.name} ({team2_side} Side)",
-                value="\n".join(player.name for player in team2.players),
-                inline=True,
-            )
-            embed.set_footer("Waiting for scores...")
-
-            if round == 2:
+            if round_no == 2:
                 team1_score += self._latest_score[0]
                 team2_score += self._latest_score[1]
-                team1_side, team2_side = "gDark", "Light"
 
                 self._match.round1_winner = team1 if self._latest_score[0] > self._latest_score[1] else team2
                 self._match.round1_scores = [self._latest_score[0], self._latest_score[1]]
 
-                if self._latest_score[0] == self._latest_score[1]:
-                    winning_msg = "Teams Tied"
-                else:
-                    winning_msg = f"{self._match.round1_winner.name} Wins"
-
-                embed.add_field(
-                    name="Round 1",
-                    value=f"**{winning_msg}**\n{self._match.round1_scores[0]} - {self._match.round1_scores[1]}",
-                    inline=False,
-                )
-
-            await self.ctx.edit_last_response(embed=embed, components=[])
+            await self.ctx.update_round(round_no, self._match)
 
             self.event.clear()
-            await self.event.wait()
+            try:
+                await asyncio.wait_for(self.event.wait(), timeout=15)
+            except asyncio.TimeoutError:
+                timeout = True
+                self._session_task = None
+                break
 
-        if sum([team1_score, team2_score]) == 0 or round < 3:
-            embed = hikari.Embed(description=f"{FAIL_EMOJI} **Session was ended**", colour=FAIL_EMBED_COLOUR)
+        # Check if rounds were completed
+        if sum([team1_score, team2_score]) == 0 or round_no < 3:
+            self._session_manager._sessions.pop(self.ctx.guild.id)
+            embed = hikari.Embed(
+                description=f"{FAIL_EMOJI} **Session was ended{" due to a timeout" if timeout else ""}**",
+                colour=FAIL_EMBED_COLOUR
+            )
             await self.ctx.edit_last_response(embed=embed, components=[])
             return
 
         team1_score += self._latest_score[0]
         team2_score += self._latest_score[1]
-        self._match.round2_winner = team1 if self._latest_score[0] > self._latest_score[1] else team2
-        self._match.round2_scores = [self._latest_score[0], self._latest_score[1]]
-
         winning_team = team1 if team1_score > team2_score else team2
 
-        winning_msg = "Teams Tied" if team1_score == team2_score else f"{winning_team.name} Wins"
+        self._match.round2_winner = team1 if self._latest_score[0] > self._latest_score[1] else team2
+        self._match.round2_scores = [self._latest_score[0], self._latest_score[1]]
+        self._match.winner = winning_team
+        self._match.final_scores = [team1_score, team2_score]
 
-        embed = hikari.Embed(
-            title=f"{winning_msg}: {team1_score} - {team2_score}",
-            description=f"{team1.name} ({team1_score}) vs {team2.name} ({team2_score})",
-            colour=DEFAULT_EMBED_COLOUR,
-        )
-        embed.add_field(name=f"{team1.name}", value="\n".join(player.name for player in team1.players), inline=True)
-        embed.add_field(name=f"{team2.name}", value="\n".join(player.name for player in team2.players), inline=True)
-
-        if self._match.round1_scores[0] == self._match.round1_scores[1]:
-            winning_msg = "Teams Tied"
-        else:
-            winning_msg = f"{self._match.round1_winner.name} Wins"
-
-        embed.add_field(
-            name="Round 1",
-            value=f"**{winning_msg}**\n{self._match.round1_scores[0]} - {self._match.round1_scores[1]}",
-            inline=False,
-        )
-
-        if self._match.round2_scores[0] == self._match.round2_scores[1]:
-            winning_msg = "Teams Tied"
-        else:
-            winning_msg = f"{self._match.round1_winner.name} Wins"
-
-        embed.add_field(
-            name="Round 2",
-            value=f"**{winning_msg}**\n{self._match.round2_scores[0]} - {self._match.round2_scores[1]}",
-            inline=False,
-        )
-        embed.set_footer(f"Session complete: {self.id}")
-
-        await self.ctx.edit_last_response(embed=embed, components=[])
+        await self.ctx.update_round(round_no, self._match)
 
         self._session_manager._sessions.pop(self.ctx.guild.id)
 
-        # ToDo: efficient only 16 db calls
-        for player in winning_team.players:
-            member = player.member
-            db_member = await DatabaseMember.fetch(member.id, self.ctx.guild.id)
-            db_member.wins += 1
-            await db_member.update()
+        # Update db
+        query = """
+        WITH new_members AS (
+        SELECT unnest($1::bigint[]) AS user_id,
+               unnest($2::bigint[]) AS guild_id
+        )
+        INSERT INTO members (userId, guildId, rank, wins, loses, ties)
+        SELECT user_id, guild_id, 0, {0}, {1}, {2}
+        FROM new_members
+        ON CONFLICT (userId, guildId)
+        DO UPDATE SET {3} = members.{3} + 1;
+        """
 
-        for player in team1.players if team1_score < team2_score else team2.players:
-            member = player.member
-            db_member = await DatabaseMember.fetch(member.id, self.ctx.guild.id)
-            db_member.loses += 1
-            await db_member.update()
+        if team1_score != team2_score:
+            loser = team1 if team1_score < team2_score else team2
+            winner_ids = [player.member.id for player in winning_team.players]
+            loser_ids = [player.member.id for player in loser.players]
+            guild_ids = [self.ctx.guild.id] * 4
+
+            await self.ctx.app.db.execute(query.format(*["1", "0", "0", "wins"]), winner_ids, guild_ids)
+            await self.ctx.app.db.execute(query.format(*["0", "1", "0", "loses"]), loser_ids, guild_ids)
+
+        else:
+            player_ids = [player.member.id for player in [*team1.players, *team2.players]]
+            guild_ids = [self.ctx.guild.id] * 8
+
+            await self.ctx.app.db.execute(query.format(*["0", "0", "1", "ties"]), player_ids, guild_ids)
 
     def add_score(self, score1: int, score2: int) -> None:
         """Add a score to this session.
@@ -644,14 +685,15 @@ class GameSession:
         self._session_task = None
         self._event.set()
 
-    # ToDo: Forced teams
-    async def start(self, members: list[hikari.Member]) -> None:
+    async def start(self, members: list[hikari.Member], force: bool = False) -> None:
         """Start this session and listening for interactions.
 
         Parameters
         ----------
         members : list[hikari.Member]
             A list of members that belong to this session (i.e. players)
+        force : bool
+            Whether a set of teams is being forced, defaults to False
 
         """
         self._id = self._session_manager.session_count
@@ -659,13 +701,21 @@ class GameSession:
         await self._fetch_rank_roles()
         await self._get_players(members)
 
-        proposed_matches = self._generate_team_pairs()
-        winning_match = await self._do_matchmaking_voting(proposed_matches)
+        if not force:
+            proposed_matches = self._generate_team_pairs()
+            winning_match = await self._do_matchmaking_voting(proposed_matches)
 
-        if not winning_match:
-            return
+            if not winning_match:
+                return
 
-        self._match = winning_match
+            self._match = winning_match
+        elif force:
+            team1 = GameTeam([player for player in self.players[:4]], create_team_name(), 0)
+            team2 = GameTeam([player for player in self.players[4:]], create_team_name(), 0)
+            self._match = GameMatch(team1, team2)
+
+            await self.ctx.wait()
+
         self._latest_score = [0, 0]
 
         self._session_task = asyncio.create_task(self._wait_for_scores())

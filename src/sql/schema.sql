@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS members
     rank smallint,
     wins smallint,
     loses smallint,
+    ties smallint,
     PRIMARY KEY (userId, guildId),
     FOREIGN KEY (guildId) REFERENCES guilds (guildId)
         ON DELETE CASCADE

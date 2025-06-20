@@ -18,7 +18,7 @@ class DatabaseMember(DatabaseModel):
     guild_id: hikari.Snowflake
     """The guild ID for this member."""
 
-    rank: int = 1
+    rank: int = 0
     """The rank of this member."""
 
     wins: int = 0
@@ -27,27 +27,31 @@ class DatabaseMember(DatabaseModel):
     loses: int = 0
     """The amount of loses for this member."""
 
+    ties: int = 0
+    """The amount of ties for this member."""
+
     async def update(self) -> None:
         """Update this member or add them if not already stored."""
         await self._db.execute(
             """
-            INSERT INTO members (userId, guildId, rank, wins  loses)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO members (userId, guildId, rank, wins, loses, ties)
+            VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (userId, guildId) DO
-            UPDATE SET rank = $3, wins = $4, loses = $5
+            UPDATE SET rank = $3, wins = $4, loses = $5, ties = $6;
             """,
-            self.id,
-            self.guild_id,
+            int(self.id),
+            int(self.guild_id),
             self.rank,
             self.wins,
             self.loses,
+            self.ties,
         )
 
     @classmethod
     async def fetch(
         cls, user: hikari.SnowflakeishOr[hikari.PartialUser], guild: hikari.SnowflakeishOr[hikari.PartialGuild]
     ) -> t.Self:
-        """Fetch this user from the database or add them if not already stored.
+        """Fetch this user from the database.
 
         Parameters
         ----------
@@ -59,7 +63,7 @@ class DatabaseMember(DatabaseModel):
         Returns
         -------
         DatabaseMember
-            Dataclass for stored members in the database.
+            Dataclass for stored member in the database or a default member if no such member exists.
 
         """
         record = await cls._db.fetchrow(
@@ -67,8 +71,7 @@ class DatabaseMember(DatabaseModel):
         )
 
         if not record:
-            member = cls(hikari.Snowflake(user), hikari.Snowflake(guild), rank=1, wins=0, loses=0)
-            await member.update()
+            member = cls(hikari.Snowflake(user), hikari.Snowflake(guild), rank=0, wins=0, loses=0, ties=0)
             return member
 
         return cls(
@@ -77,6 +80,7 @@ class DatabaseMember(DatabaseModel):
             rank=record["rank"],
             wins=record["wins"],
             loses=record["loses"],
+            ties=record["ties"],
         )
 
 

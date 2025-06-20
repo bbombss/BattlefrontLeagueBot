@@ -227,7 +227,7 @@ class BattleFrontBot(lightbulb.BotApp):
         welcome_embed = hikari.Embed(
             title="👋  Greetings",
             description="""I'm always listening for commands type / to see what I can do.
-In the meantime I'll get things set up!""",
+Make sure to set the rank roles using `/roles`""",
             colour=DEFAULT_EMBED_COLOUR,
         ).set_thumbnail(me.avatar_url)
 

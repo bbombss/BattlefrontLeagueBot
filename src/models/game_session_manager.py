@@ -56,7 +56,7 @@ class GameSessionManager:
         return self._session_count
 
     async def start_session(
-        self, guild_id: hikari.Snowflake, session: GameSession, members: list[hikari.Member]
+        self, guild_id: hikari.Snowflake, session: GameSession, members: list[hikari.Member], force: bool = False
     ) -> None:
         """Start a session.
 
@@ -68,11 +68,13 @@ class GameSessionManager:
             The game session that is being started.
         members : list[hikari.Member]
             A list of members that belong to this session (i.e. members).
+        force : bool
+            Whether a set of teams is being forced, defaults to False
 
         """
         self._sessions[guild_id] = session
         self._session_count += 1
-        await self._sessions[guild_id].start(members)
+        await self._sessions[guild_id].start(members, force)
 
     def fetch_session(self, guild_id: hikari.Snowflake) -> GameSession | None:
         """Fetch a session from a guild, returns none if this guild has no session.

@@ -8,6 +8,7 @@ from src.models import (
     CapsRegisterView,
     GameSession,
     SessionContext,
+    DatabaseMember
 )
 from src.static import *
 from src.utils import is_admin
@@ -121,7 +122,10 @@ async def set_roles(
 @lightbulb.option("timeout", "How long the bot should wait for 8 players", type=int, required=False)
 @lightbulb.command("start", description="Starts a game session", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
-async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None:
+async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
+    if not timeout:
+        timeout = 30
+
     if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
         await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)
         return
@@ -130,7 +134,7 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None
     assert record is not None
     if record["rank1role"] is None or record["rank2role"] is None or record["rank3role"] is None:
         await ctx.respond_with_failure(
-            "Could not find rank roles for server, use `/setroles` to configure rank roles", ephemeral=True
+            "Could not find rank roles for server, use `/roles` to configure rank roles", ephemeral=True
         )
         return
 
@@ -141,14 +145,14 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None
     )
     embed.set_footer("Waiting for players...")
 
-    view = CapsRegisterView(timeout=timeout)
+    view = CapsRegisterView(embed, author=ctx.member.id, timeout=timeout*60)
 
     message = await ctx.respond(embed=embed, components=view)
 
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
+    view.registered_members = get_fake_members()  # del
 
-    view.registered_members = get_fake_members()
     if len(view.registered_members) < 8:
         await message.edit(
             embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
@@ -180,7 +184,7 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int = 600) -> None
 @battlefront.command
 @lightbulb.option("team2score", "The score for team 2", type=int, required=True)
 @lightbulb.option("team1score", "The score for team 1", type=int, required=True)
-@lightbulb.command("score", description="Add a score to an ongoing session.", pass_options=True)
+@lightbulb.command("score", description="Add a score to an ongoing session", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def capsresult(ctx: BattlefrontBotSlashContext, team1score: int, team2score: int) -> None:
     session = ctx.app.game_session_manager.fetch_session(ctx.guild_id)
@@ -196,6 +200,55 @@ async def capsresult(ctx: BattlefrontBotSlashContext, team1score: int, team2scor
 
 
 @battlefront.command
+@lightbulb.option("player", "The player", type=hikari.Member, required=True)
+@lightbulb.command("career", description="Shows a players stats", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None:
+    db_member = await DatabaseMember.fetch(player.id, ctx.guild_id)
+    if sum([db_member.wins, db_member.loses]) == 0:
+        await ctx.respond_with_failure("**This player has no stats**", ephemeral=True)
+        return
+
+    embed = hikari.Embed(
+        title=player.display_name,
+        description=f"**Wins:** {db_member.wins}\n**Loses:** {db_member.loses}\n"
+                    f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins)), 3)}",
+        colour=DEFAULT_EMBED_COLOUR
+    )
+    embed.set_thumbnail(player.avatar_url)
+    await ctx.respond(embed=embed)
+
+
+@battlefront.command
+@lightbulb.option("player8", "Team 2", type=hikari.Member, required=True)
+@lightbulb.option("player7", "Team 2", type=hikari.Member, required=True)
+@lightbulb.option("player6", "Team 2", type=hikari.Member, required=True)
+@lightbulb.option("player5", "Team 2", type=hikari.Member, required=True)
+@lightbulb.option("player4", "Team 1", type=hikari.Member, required=True)
+@lightbulb.option("player3", "Team 1", type=hikari.Member, required=True)
+@lightbulb.option("player2", "Team 1", type=hikari.Member, required=True)
+@lightbulb.option("player1", "Team 1", type=hikari.Member, required=True)
+@lightbulb.command("forcestart", description="Starts Caps with a forced set of teams", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def forcestart(
+        ctx: BattlefrontBotSlashContext, player1: hikari.Member, player2: hikari.Member,
+        player3: hikari.Member, player4: hikari.Member, player5: hikari.Member, player6: hikari.Member,
+        player7: hikari.Member, player8: hikari.Member
+) -> None:
+    if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
+        await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)
+        return
+
+    game_context = SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member)
+    session = GameSession(game_context)
+
+    players = [player1, player2, player3, player4, player5, player6, player7, player8]
+
+    await ctx.respond_with_success("**Started a match with forced teams**", ephemeral=True)
+    await ctx.app.game_session_manager.start_session(ctx.guild_id, session, players, force=True)
+
+
+@battlefront.command
 @lightbulb.command("end", description="Stops an ongoing session")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def endsession(ctx: BattlefrontBotSlashContext) -> None:
@@ -203,7 +256,7 @@ async def endsession(ctx: BattlefrontBotSlashContext) -> None:
     if not session or not session.session_task:
         await ctx.respond_with_failure("**Could not find a game session for this server**", ephemeral=True)
         return
-    if session.ctx.author.id != ctx.author.id:
+    if session.ctx.author.id != ctx.author.id and not is_admin(ctx.member):
         await ctx.respond_with_failure("**You cannot end this session**", ephemeral=True)
         return
 

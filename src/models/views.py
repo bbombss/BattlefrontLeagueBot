@@ -267,17 +267,21 @@ class CapsVotingView(miru.View):
 
     def __init__(
         self,
+        author: hikari.Snowflake | None = None,
         timeout: float = 30,
     ):
         """View for prompting a users to vote for teams.
 
         Parameters
         ----------
+        author : hikari.Snowflake | None
+            An author id, if given only the author can override, defaults to None.
         timeout : float
             Timeout for view, defaults to 30.
 
         """
         super().__init__(timeout=timeout)
+        self.author = author
         self.votes: dict[hikari.Snowflake, int] = {}
         self.override: bool = False
         self.overriding_user: hikari.Snowflake
@@ -296,6 +300,9 @@ class CapsVotingView(miru.View):
         self.votes[ctx.user.id] = 1
         await ctx.respond("Your vote for team 1 was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
+        if len(self.votes) == 8:
+            self.stop()
+
     @miru.button("2", style=hikari.ButtonStyle.PRIMARY)
     async def vote_2(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if self.override:
@@ -309,6 +316,9 @@ class CapsVotingView(miru.View):
 
         self.votes[ctx.user.id] = 2
         await ctx.respond("Your vote for team 2 was counted", flags=hikari.MessageFlag.EPHEMERAL)
+
+        if len(self.votes) == 8:
+            self.stop()
 
     @miru.button("3", style=hikari.ButtonStyle.PRIMARY)
     async def vote_3(self, ctx: miru.ViewContext, button: miru.Button) -> None:
@@ -324,6 +334,9 @@ class CapsVotingView(miru.View):
         self.votes[ctx.user.id] = 3
         await ctx.respond("Your vote for team 3 was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
+        if len(self.votes) == 8:
+            self.stop()
+
     @miru.button("4", style=hikari.ButtonStyle.PRIMARY)
     async def vote_4(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if self.override:
@@ -338,10 +351,13 @@ class CapsVotingView(miru.View):
         self.votes[ctx.user.id] = 4
         await ctx.respond("Your vote for team 4 was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
+        if len(self.votes) == 8:
+            self.stop()
+
     @miru.button(emoji="⚖️", style=hikari.ButtonStyle.DANGER)
     async def override(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        if not is_admin(ctx.member):
-            await ctx.respond("You must be an administrator to override voting.", flags=hikari.MessageFlag.EPHEMERAL)
+        if self.author and self.author != ctx.user.id and not is_admin(ctx.member):
+            await ctx.respond("You are not allowed to override this action", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
         if self.override and ctx.user.id == self.overriding_user:
@@ -358,23 +374,45 @@ class CapsVotingView(miru.View):
             "**Overriding Votes:** Vote again now to finalise the teams :point_up:", flags=hikari.MessageFlag.EPHEMERAL
         )
 
+    @miru.button(emoji="🔁", style=hikari.ButtonStyle.DANGER)
+    async def regen(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        if self.author and self.author != ctx.user.id and not is_admin(ctx.member):
+            await ctx.respond("You are not allowed to override this action", flags=hikari.MessageFlag.EPHEMERAL)
+            return
+
+        await ctx.respond(
+            "Resetting teams", flags=hikari.MessageFlag.EPHEMERAL
+        )
+
+        self.votes.clear()
+        self.votes[ctx.user.id] = 5
+        self.stop()
+
 
 class CapsRegisterView(miru.View):
     """View for prompting users to register for caps."""
 
     def __init__(
         self,
-        timeout: float = 600,
+        embed: hikari.Embed,
+        author: hikari.Snowflake | None = None,
+        timeout: float = 900,
     ) -> None:
         """View for prompting users to register for caps.
 
         Parameters
         ----------
+        embed : hikari.Embed
+            The embed this view is tied to.
+        author : hikari.Snowflake | None
+            An author id, if given only the author can delete, defaults to None.
         timeout : float
-            Timeout for view, defaults to 600.
+            Timeout for view, defaults to 900.
 
         """
         super().__init__(timeout=timeout)
+        self.embed = embed
+        self.author = author
         self.registered_members: list[hikari.Member] = []
 
     @miru.button(label="Register", style=hikari.ButtonStyle.PRIMARY)
@@ -386,8 +424,21 @@ class CapsRegisterView(miru.View):
         self.registered_members.append(ctx.member)
         await ctx.respond("Thank you for registering :heart_hands:", flags=hikari.MessageFlag.EPHEMERAL)
 
+        if len(self.registered_members) > 1:
+            self.embed.remove_field(0)
+        self.embed.add_field(name="Players", value="\n".join([user.display_name for user in self.registered_members]))
+        await self.message.edit(embed=self.embed)
+
         if len(self.registered_members) == 8:
             self.stop()
+
+    @miru.button(emoji="🗑️", style=hikari.ButtonStyle.DANGER)
+    async def stop_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        if self.author and self.author != ctx.user.id and not is_admin(ctx.member):
+            await ctx.respond("You are not allowed to stop this action", flags=hikari.MessageFlag.EPHEMERAL)
+            return
+
+        self.stop()
 
 
 class RetryView(miru.View):
@@ -428,7 +479,7 @@ class RetryView(miru.View):
     @miru.button(emoji="🔄", style=hikari.ButtonStyle.PRIMARY)
     async def retry_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if self.author and self.author != ctx.user.id:
-            await ctx.respond("You are not allowed to retry this action.", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond("You are not allowed to retry this action", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
         self.value = True
