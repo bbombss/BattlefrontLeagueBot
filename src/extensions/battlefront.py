@@ -6,9 +6,9 @@ from src.models import (
     BattlefrontBotPlugin,
     BattlefrontBotSlashContext,
     CapsRegisterView,
+    DatabaseMember,
     GameSession,
     SessionContext,
-    DatabaseMember
 )
 from src.static import *
 from src.utils import is_admin
@@ -145,13 +145,12 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     )
     embed.set_footer("Waiting for players...")
 
-    view = CapsRegisterView(embed, author=ctx.member.id, timeout=timeout*60)
+    view = CapsRegisterView(embed, author=ctx.member.id, timeout=timeout * 60)
 
     message = await ctx.respond(embed=embed, components=view)
 
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
-    view.registered_members = get_fake_members()  # del
 
     if len(view.registered_members) < 8:
         await message.edit(
@@ -212,8 +211,8 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
     embed = hikari.Embed(
         title=player.display_name,
         description=f"**Wins:** {db_member.wins}\n**Loses:** {db_member.loses}\n"
-                    f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins)), 3)}",
-        colour=DEFAULT_EMBED_COLOUR
+        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins)), 3)}",
+        colour=DEFAULT_EMBED_COLOUR,
     )
     embed.set_thumbnail(player.avatar_url)
     await ctx.respond(embed=embed)
@@ -231,9 +230,15 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
 @lightbulb.command("forcestart", description="Starts Caps with a forced set of teams", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def forcestart(
-        ctx: BattlefrontBotSlashContext, player1: hikari.Member, player2: hikari.Member,
-        player3: hikari.Member, player4: hikari.Member, player5: hikari.Member, player6: hikari.Member,
-        player7: hikari.Member, player8: hikari.Member
+    ctx: BattlefrontBotSlashContext,
+    player1: hikari.Member,
+    player2: hikari.Member,
+    player3: hikari.Member,
+    player4: hikari.Member,
+    player5: hikari.Member,
+    player6: hikari.Member,
+    player7: hikari.Member,
+    player8: hikari.Member,
 ) -> None:
     if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
         await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)

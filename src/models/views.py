@@ -381,7 +381,7 @@ class CapsVotingView(miru.View):
             return
 
         await ctx.respond(
-            "Resetting teams", flags=hikari.MessageFlag.EPHEMERAL
+            "**Regenerating teams**\n*Note: You can only regenerate teams 3 times*", flags=hikari.MessageFlag.EPHEMERAL
         )
 
         self.votes.clear()

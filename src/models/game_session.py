@@ -265,7 +265,7 @@ class SessionContext:
         return winner_vote
 
     async def update_round(self, round_no: int, match: GameMatch) -> hikari.Message:
-        """Updates the round information embed with the latest round information.
+        """Update the round information embed with the latest round information.
 
         Parameters
         ----------
@@ -283,23 +283,28 @@ class SessionContext:
         sides = ["Light", "Dark"]
 
         if round_no == 3:
-            win_title = (f"{match.winner.name} Wins: {match.final_scores[0]} - {match.final_scores[1]}"
-                         if match.final_scores[0] != match.final_scores[1] else "Teams Tied")
+            win_title = (
+                f"{match.winner.name} Wins: {match.final_scores[0]} - {match.final_scores[1]}"
+                if match.final_scores[0] != match.final_scores[1]
+                else "Teams Tied"
+            )
             win_desc = f"{match.team1.name} ({match.final_scores[0]}) vs {match.team2.name} ({match.final_scores[1]})"
 
         embed = hikari.Embed(
             title=f"Round {round_no}" if round_no < 3 else win_title,
             description=f"**{match.team1.name}** (Rank {match.team1.skill}) vs "
-                        f"**{match.team2.name}** (Rank {match.team2.skill})" if round_no < 3 else win_desc,
-            colour=DEFAULT_EMBED_COLOUR
+            f"**{match.team2.name}** (Rank {match.team2.skill})"
+            if round_no < 3
+            else win_desc,
+            colour=DEFAULT_EMBED_COLOUR,
         )
         embed.add_field(
-            name=f"{match.team1.name}{f" ({sides[0] if round_no == 1 else sides[1]} Side)" if round_no < 3 else ""}",
+            name=f"{match.team1.name}{f' ({sides[0] if round_no == 1 else sides[1]} Side)' if round_no < 3 else ''}",
             value="\n".join(player.name for player in match.team1.players),
             inline=True,
         )
         embed.add_field(
-            name=f"{match.team2.name}{f" ({sides[1] if round_no == 1 else sides[0]} Side)" if round_no < 3 else ""}",
+            name=f"{match.team2.name}{f' ({sides[1] if round_no == 1 else sides[0]} Side)' if round_no < 3 else ''}",
             value="\n".join(player.name for player in match.team2.players),
             inline=True,
         )
@@ -312,9 +317,9 @@ class SessionContext:
                 winning_msg = f"{match.round1_winner.name} Wins"
 
             embed.add_field(
-                name=f"Round 1",
+                name="Round 1",
                 value=f"**{winning_msg}**\n{match.round1_scores[0]} - {match.round1_scores[1]}",
-                inline=False
+                inline=False,
             )
 
         if match.round2_winner:
@@ -324,9 +329,9 @@ class SessionContext:
                 winning_msg = f"{match.round2_winner.name} Wins"
 
             embed.add_field(
-                name=f"Round 2",
+                name="Round 2",
                 value=f"**{winning_msg}**\n{match.round2_scores[0]} - {match.round2_scores[1]}",
-                inline=False
+                inline=False,
             )
 
         return await self.edit_last_response("", embed=embed, components=[])
@@ -493,7 +498,6 @@ class GameSession:
 
         # Sorts the results by team skill diff and takes top four (least diff)
         results.sort(key=lambda r: r["difference"])
-        # top_four_teams = results[:4]
 
         teams = []
 
@@ -527,10 +531,11 @@ class GameSession:
         """
         await self.ctx.wait()
         iter = 0
-        matches_groups = [matches[:4], matches[4:8], matches[8:12]]
+        matches_groups = [matches[:4], matches[4:8], matches[8:12], matches[12:16]]
 
         while True:  # lol
             iter += 1
+            match_index = iter - 1 if iter < 5 else 3
 
             embed = hikari.Embed(
                 title="Team Voting",
@@ -538,7 +543,7 @@ class GameSession:
                 colour=DEFAULT_EMBED_COLOUR,
             )
 
-            for i, match in enumerate(matches_groups[iter-1], 1):
+            for i, match in enumerate(matches_groups[match_index], 1):
                 embed.add_field(
                     name=f"Team {i}",
                     value=f"**{match.team1.name}** - vs - **{match.team2.name}**\n"
@@ -571,8 +576,6 @@ class GameSession:
                 return
 
             if winner_vote == 5:
-                if iter > 3:
-                    return  # ToDo
                 continue
 
             return matches[((winner_vote + (4 * (iter - 1))) - 1)]
@@ -616,8 +619,8 @@ class GameSession:
         if sum([team1_score, team2_score]) == 0 or round_no < 3:
             self._session_manager._sessions.pop(self.ctx.guild.id)
             embed = hikari.Embed(
-                description=f"{FAIL_EMOJI} **Session was ended{" due to a timeout" if timeout else ""}**",
-                colour=FAIL_EMBED_COLOUR
+                description=f"{FAIL_EMOJI} **Session was ended{' due to a timeout' if timeout else ''}**",
+                colour=FAIL_EMBED_COLOUR,
             )
             await self.ctx.edit_last_response(embed=embed, components=[])
             return

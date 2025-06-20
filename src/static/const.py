@@ -14,7 +14,7 @@ __all__ = [
 
 import hikari
 
-DEFAULT_EMBED_COLOUR: hikari.Colour = hikari.Colour(0xff6f1c)
+DEFAULT_EMBED_COLOUR: hikari.Colour = hikari.Colour(0xFF6F1C)
 SUCCESS_EMBED_COLOUR: hikari.Colour = hikari.Colour(0x0D6623)
 WARN_EMBED_COLOUR: hikari.Colour = hikari.Colour(0xAB6B13)
 FAIL_EMBED_COLOUR: hikari.Colour = hikari.Colour(0x9C251C)
