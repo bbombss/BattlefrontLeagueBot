@@ -18,7 +18,7 @@ psutil.cpu_percent(interval=1)
 
 
 @misc.command
-@lightbulb.add_cooldown(1, 10, lightbulb.buckets.UserBucket)
+@lightbulb.add_cooldown(10, 1, lightbulb.buckets.UserBucket)
 @lightbulb.command("info", description="Get performance statistics for the bot")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def bot_info(ctx: BattlefrontBotSlashContext) -> None:

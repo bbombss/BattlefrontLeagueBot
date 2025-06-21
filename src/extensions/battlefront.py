@@ -203,9 +203,11 @@ async def capsresult(ctx: BattlefrontBotSlashContext, team1score: int, team2scor
 @lightbulb.command("career", description="Shows a players stats", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None:
+    await ctx.wait()
+
     db_member = await DatabaseMember.fetch(player.id, ctx.guild_id)
     if sum([db_member.wins, db_member.loses]) == 0:
-        await ctx.respond_with_failure("**This player has no stats**", ephemeral=True)
+        await ctx.respond_with_failure("**This player has no stats**", edit=True)
         return
 
     embed = hikari.Embed(
@@ -215,7 +217,41 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
         colour=DEFAULT_EMBED_COLOUR,
     )
     embed.set_thumbnail(player.avatar_url)
-    await ctx.respond(embed=embed)
+    await ctx.edit_last_response("", embed=embed)
+
+
+@battlefront.command
+@lightbulb.add_cooldown(30, 1, lightbulb.buckets.GuildBucket)
+@lightbulb.command("leaderboard", description="Shows the leaderboard for this server", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
+    await ctx.wait()
+    records = await ctx.app.db.fetch("SELECT * FROM members WHERE guildId = $1", ctx.guild_id)
+
+    if not records:
+        await ctx.respond_with_failure("**This server has no stats**", edit=True)
+        return
+
+    members = {}
+    for record in records:
+        if record["wins"] == 0:
+            continue
+        members[await ctx.app.rest.fetch_member(ctx.guild_id, record["userid"])] = record["wins"]
+
+    if len(members) == 0:
+        await ctx.respond_with_failure("**This server has no stats**", edit=True)
+        return
+
+    if len(members) > 10:
+        members = members[:10]
+    members = dict(sorted(members.items(), key=lambda item: item[1], reverse=True))
+
+    embed = hikari.Embed(
+        title="LeaderBoard (Wins)",
+        description="\n".join(f"**{member.display_name}:** {members[member]}" for member in members),
+        colour=DEFAULT_EMBED_COLOUR,
+    )
+    await ctx.edit_last_response("", embed=embed)
 
 
 @battlefront.command

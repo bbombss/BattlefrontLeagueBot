@@ -337,7 +337,6 @@ class SessionContext:
         return await self.edit_last_response("", embed=embed, components=[])
 
 
-# ToDo: Proper session management for ending
 class GameSession:
     """Session object that is used to track game progress and stats."""
 
@@ -609,7 +608,7 @@ class GameSession:
 
             self.event.clear()
             try:
-                await asyncio.wait_for(self.event.wait(), timeout=15)
+                await asyncio.wait_for(self.event.wait(), timeout=999)
             except asyncio.TimeoutError:
                 timeout = True
                 self._session_task = None
