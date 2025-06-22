@@ -1,3 +1,6 @@
+import os
+from random import randint
+
 import hikari
 import lightbulb
 
@@ -147,8 +150,9 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
 
     view = CapsRegisterView(embed, author=ctx.member.id, timeout=timeout * 60)
 
-    message = await ctx.respond(embed=embed, components=view)
+    resp = await ctx.respond(embed=embed, components=view)
 
+    message = await resp.message()
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
 
@@ -232,11 +236,16 @@ async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
         await ctx.respond_with_failure("**This server has no stats**", edit=True)
         return
 
+    guild_members = await ctx.app.rest.fetch_members(ctx.guild_id)  # Better off making one bulk call then many
+
     members = {}
     for record in records:
         if record["wins"] == 0:
             continue
-        members[await ctx.app.rest.fetch_member(ctx.guild_id, record["userid"])] = record["wins"]
+
+        for member in guild_members:
+            if member.id == record["userid"]:
+                members[member] = record["wins"]
 
     if len(members) == 0:
         await ctx.respond_with_failure("**This server has no stats**", edit=True)
@@ -251,6 +260,60 @@ async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
         description="\n".join(f"**{member.display_name}:** {members[member]}" for member in members),
         colour=DEFAULT_EMBED_COLOUR,
     )
+    await ctx.edit_last_response("", embed=embed)
+
+
+@battlefront.command
+@lightbulb.option("amount", "Amount of maps to generate", type=int, required=False, min_value=1, max_value=3)
+@lightbulb.option("index", "Map index", type=int, required=True, min_value=1, max_value=3)
+@lightbulb.command("randmap", description="Picks a random map", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int) -> None:
+    await ctx.wait()
+
+    if index == 1:
+        possible_maps = [map for map in MAPS if MAPS[map] != 0]
+    elif index == 2:
+        possible_maps = [map for map in MAPS if MAPS[map] > 1]
+    elif index == 3:
+        possible_maps = [map for map in MAPS if MAPS[map] > 2]
+    else:
+        await ctx.respond_with_failure(
+            "Index must be between 1-3 indicating the minimum required rotation depth", edit=True
+        )
+        return
+
+    if not amount:
+        amount = 1
+    for i in range(0, amount):
+        game_map = possible_maps[randint(0, len(possible_maps) - 1)]
+        img_path = os.path.join(ctx.app.base_dir, "src", "static", "img", game_map.lower().replace(" ", "_") + ".jpg")
+
+        embed = hikari.Embed(title=game_map, colour=DEFAULT_EMBED_COLOUR).set_image(img_path)
+
+        if i == 0:
+            await ctx.edit_last_response("", embed=embed)
+        else:
+            await ctx.respond("", embed=embed)
+
+
+async def maps_autocomplete(
+    option: hikari.interactions.command_interactions.AutocompleteInteractionOption,
+    interaction: hikari.interactions.command_interactions.AutocompleteInteraction,
+) -> list[str]:
+    return [map for map in MAPS if MAPS[map] != 0]
+
+
+@battlefront.command
+@lightbulb.option("name", "Name of the map", type=str, required=True, autocomplete=maps_autocomplete)
+@lightbulb.command("map", description="Get a map", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def getmap(ctx: BattlefrontBotSlashContext, name: str) -> None:
+    await ctx.wait()
+
+    img_path = os.path.join(ctx.app.base_dir, "src", "static", "img", name.lower().replace(" ", "_") + ".jpg")
+    embed = hikari.Embed(title=name, colour=DEFAULT_EMBED_COLOUR).set_image(img_path)
+
     await ctx.edit_last_response("", embed=embed)
 
 
@@ -278,6 +341,14 @@ async def forcestart(
 ) -> None:
     if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
         await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)
+        return
+
+    record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
+    assert record is not None
+    if record["rank1role"] is None or record["rank2role"] is None or record["rank3role"] is None:
+        await ctx.respond_with_failure(
+            "Could not find rank roles for server, use `/roles` to configure rank roles", ephemeral=True
+        )
         return
 
     game_context = SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member)

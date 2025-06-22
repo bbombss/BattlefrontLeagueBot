@@ -4,10 +4,32 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Match voting fixed">
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Add leaderboard command">
+      <change afterPath="$PROJECT_DIR$/src/static/battlefront.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/ajan_kloss.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/bespin_palace.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/death_star_ii.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/endor_research_station.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/geonosis_dreadnought.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/hoth_outpost_delta.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/jabbas_palace.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/jakku_the_graveyard.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/kamino_cloning_facility.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/kessel_coaxium_mine.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/naboo_palace.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/naboo_ship.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/resurgent_star_destroyer.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/scariff_beach.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/takodana_castle.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/takodana_mc85.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/tatooine_mos_eisley.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/yavin_4.jpg" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/extensions/errorhandler.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/errorhandler.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/views.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/static/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/static/const.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/const.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -31,21 +53,24 @@
   &quot;associatedIndex&quot;: 7
 }</component>
   <component name="ProjectId" id="2yV27YTo69Ya6vzBh2l95ALMDSB" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;Python.Main.executor&quot;: &quot;Run&quot;,
-    &quot;Python.config.executor&quot;: &quot;Run&quot;,
-    &quot;Python.test.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/benho/Repositories/BBombsBot&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_ADD_EXTERNAL_FILES": "true",
+    "Python.Main.executor": "Run",
+    "Python.config.executor": "Run",
+    "Python.test.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "C:/Users/benho/Repositories/BBombsBot"
   }
-}</component>
+}]]></component>
   <component name="RunManager">
     <configuration name="Main" type="PythonConfigurationType" factoryName="Python">
       <module name="Battlefront2Bot" />
@@ -143,7 +168,15 @@
       <option name="project" value="LOCAL" />
       <updated>1750439969871</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Add leaderboard command">
+      <option name="closed" value="true" />
+      <created>1750494415963</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1750494415963</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -159,6 +192,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <option name="CHECK_NEW_TODO" value="false" />
+    <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
     <MESSAGE value="Initial commit, main bot components" />
     <MESSAGE value="Session object added, ext in progress (untested/ failed)" />
     <MESSAGE value="Session object progress and session manager (Passed)" />
@@ -166,6 +200,7 @@
     <MESSAGE value="Game session, game loop complete but very cursed (needs refactor)" />
     <MESSAGE value="Game logic optimisations and fixes" />
     <MESSAGE value="Match voting fixed" />
-    <option name="LAST_COMMIT_MESSAGE" value="Match voting fixed" />
+    <MESSAGE value="Add leaderboard command" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add leaderboard command" />
   </component>
 </project>

@@ -1,3 +1,4 @@
+from .battlefront import *
 from .const import *
 
 

@@ -415,10 +415,17 @@ class CapsRegisterView(miru.View):
         self.author = author
         self.registered_members: list[hikari.Member] = []
 
+    async def on_timeout(self) -> None:
+        if self.message:
+            for item in self.children:
+                item.disabled = True
+            await self.message.edit(components=self)
+        self.stop()
+
     @miru.button(label="Register", style=hikari.ButtonStyle.PRIMARY)
     async def confirm_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if ctx.member in self.registered_members:
-            await ctx.respond("You are already registered for this event.", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond("You are already registered for this event", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
         self.registered_members.append(ctx.member)
@@ -431,6 +438,19 @@ class CapsRegisterView(miru.View):
 
         if len(self.registered_members) == 8:
             self.stop()
+
+    @miru.button(label="Leave", style=hikari.ButtonStyle.PRIMARY)
+    async def leave_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        if ctx.member not in self.registered_members:
+            await ctx.respond("You are not already registered", flags=hikari.MessageFlag.EPHEMERAL)
+            return
+
+        self.registered_members.remove(ctx.member)
+        await ctx.respond("You have been removed", flags=hikari.MessageFlag.EPHEMERAL)
+
+        self.embed.remove_field(0)
+        self.embed.add_field(name="Players", value="\n".join([user.display_name for user in self.registered_members]))
+        await self.message.edit(embed=self.embed)
 
     @miru.button(emoji="🗑️", style=hikari.ButtonStyle.DANGER)
     async def stop_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:

@@ -141,26 +141,30 @@ async def application_command_error_handler(event: lightbulb.CommandErrorEvent) 
             return
 
     logger.error(f"Ignoring exception in {ctx.guild_id} /{ctx.command.name} -> {error.__class__.__name__}: {error}")
+    error_str = "\n".join(traceback.format_exception(type(error), error, error.__traceback__))
+    await log_error(error_str, ctx=ctx)
 
     error = error.original if hasattr(error, "original") else error  # type: ignore
 
-    await ctx.delete_last_response()
-
-    await ctx.respond(
-        embed=hikari.Embed(
-            title=f"{FAIL_EMOJI} Unknown Error",
-            description=f"""An unhandled exception has occurred in the BBombsBot application.
-This has been automatically logged, contact the bot administrator or raise an issue on [GitHub]({GITHUB_LINK}) if this issue persists.""",
-            colour=FAIL_EMBED_COLOUR,
-            timestamp=datetime.datetime.now(tz=datetime.timezone.utc),
-        )
-        .add_field(name="Error", value=f"```{error.__class__.__name__}: {error}```")
-        .set_footer(str(ctx.guild_id))
+    embed = hikari.Embed(
+        title=f"{FAIL_EMOJI} Unknown Error",
+        description=f"""An unhandled exception has occurred in the BBombsBot application.
+        This has been automatically logged, contact the bot administrator or raise an issue on [GitHub]({GITHUB_LINK}) if this issue persists.""",
+        colour=FAIL_EMBED_COLOUR,
+        timestamp=datetime.datetime.now(tz=datetime.timezone.utc),
     )
+    embed.add_field(name="Error", value=f"```{error.__class__.__name__}: {error}```")
+    embed.set_footer(str(ctx.guild_id))
 
-    error_str = "\n".join(traceback.format_exception(type(error), error, error.__traceback__))
+    try:
+        await ctx.delete_last_response()
+        await ctx.respond(embed=embed)
+    except hikari.UnauthorizedError:
+        if len(ctx.responses) > 0:
+            message = await ctx.responses[-1].message()
+            await message.delete()
 
-    await log_error(error_str, ctx=ctx)
+        await ctx.app.rest.create_message(ctx.channel_id, "*Failed to access original message*", embed=embed)
 
 
 @errorhandler.listener(lightbulb.PrefixCommandErrorEvent)
