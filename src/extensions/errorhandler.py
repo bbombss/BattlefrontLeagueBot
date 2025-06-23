@@ -164,7 +164,9 @@ async def application_command_error_handler(event: lightbulb.CommandErrorEvent) 
             message = await ctx.responses[-1].message()
             await message.delete()
 
-        await ctx.app.rest.create_message(ctx.channel_id, "*Failed to access original message*", embed=embed)
+        await ctx.app.rest.create_message(ctx.channel_id, embed=embed)
+    except hikari.ForbiddenError:
+        await ctx.app.rest.create_message(ctx.channel_id, embed=embed)
 
 
 @errorhandler.listener(lightbulb.PrefixCommandErrorEvent)

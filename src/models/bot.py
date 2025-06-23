@@ -77,7 +77,7 @@ class BattleFrontBot(lightbulb.BotApp):
         self._version: str
 
         self._db = Database(self)
-        self._miru_client = miru.Client(self)
+        self._miru_client = miru.Client(self, ignore_unknown_interactions=True)
         self._game_session_manager = GameSessionManager(self)
 
     @property
