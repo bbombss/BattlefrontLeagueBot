@@ -114,6 +114,29 @@ async def sync_commands(ctx: BattlefrontBotPrefixContext) -> None:
 
 
 @admin.command
+@lightbulb.option("messageid", "Message id")
+@lightbulb.command("stopview", "Stop a view bound to a message", pass_options=True)
+@lightbulb.implements(lightbulb.PrefixCommand)
+async def stop_view(ctx: BattlefrontBotPrefixContext, messageid: str) -> None:
+    await ctx.wait()
+
+    try:
+        id = int(messageid)
+    except ValueError:
+        await ctx.respond_with_failure("**Invalid message id provided**", edit=True)
+        return
+
+    view = ctx.app.miru_client.get_bound_view(id)
+    if view is None:
+        await ctx.respond_with_failure("**No component found at provided message**", edit=True)
+        return
+
+    view.stop()
+
+    await ctx.respond_with_success("**Stopped the view**", edit=True)
+
+
+@admin.command
 @lightbulb.option(
     "code",
     "Code to run, overridden by attached file.",

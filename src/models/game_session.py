@@ -404,7 +404,7 @@ class GameSession:
             "3": hikari.Snowflake(record["rank3role"]),
         }
 
-    async def _get_player_object(self, member: hikari.Member) -> GamePlayer:
+    async def _get_player_object(self, member: hikari.Member) -> GamePlayer | None:
         """Get a GamePlayer object for this member.
 
         Parameters
@@ -414,8 +414,8 @@ class GameSession:
 
         Returns
         -------
-        GamePlayer
-            A GamePlayer object that corresponds the member.
+        GamePlayer | None
+            A GamePlayer object that corresponds the member or None if one cannot be obtained.
 
         """
         rank_role: int | None = None
@@ -433,7 +433,13 @@ class GameSession:
 
         if not rank_role:
             self._session_manager._sessions.pop(self.ctx.guild.id)
-            raise GameSessionError(f"Member {member.display_name} does not have rank role")
+            await self.ctx.respond(
+                hikari.Embed(
+                    description=f"{FAIL_EMOJI} **Member {member.display_name} does not have a rank role aborting**",
+                    colour=FAIL_EMBED_COLOUR,
+                )
+            )
+            return
 
         game_player = GamePlayer(member, member.display_name, rank_role)
         self.ctx.app.game_session_manager.player_cache.set(member.id, game_player)
@@ -608,7 +614,7 @@ class GameSession:
 
             self.event.clear()
             try:
-                await asyncio.wait_for(self.event.wait(), timeout=999)
+                await asyncio.wait_for(self.event.wait(), timeout=2048)
             except asyncio.TimeoutError:
                 timeout = True
                 self._session_task = None
@@ -702,6 +708,9 @@ class GameSession:
 
         await self._fetch_rank_roles()
         await self._get_players(members)
+
+        if any(p is None for p in self.players):
+            return
 
         if not force:
             proposed_matches = self._generate_team_pairs()

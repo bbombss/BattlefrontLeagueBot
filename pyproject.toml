@@ -23,6 +23,7 @@ ignore = ["F403","D213","D203","F405","ASYNC109"]
 [tool.ruff.lint.per-file-ignores]
 "errors.py" = ["E501"]
 "errorhandler.py" = ["E501"]
+"config-template.py" = ["ALL"]
 
 [tool.ruff.format]
 quote-style = "double"

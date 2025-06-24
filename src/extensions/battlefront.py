@@ -17,6 +17,7 @@ from src.static import *
 from src.utils import is_admin
 
 battlefront = BattlefrontBotPlugin("battlefront")
+battlefront.add_checks(lightbulb.checks.guild_only)  # ToDo: Check bot is in channel + error handler
 
 
 # For testing
@@ -84,9 +85,7 @@ def get_fake_members() -> list[Fakemember]:
         Fakemember(
             8,
             "fake8",
-            [
-                1384108535478095883,
-            ],
+            [],
         ),
     ]
 
@@ -122,7 +121,7 @@ async def set_roles(
 
 
 @battlefront.command
-@lightbulb.option("timeout", "How long the bot should wait for 8 players", type=int, required=False)
+@lightbulb.option("timeout", "How long the bot should wait for 8 players", type=int, required=False, max_value=999)
 @lightbulb.command("start", description="Starts a game session", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
@@ -155,7 +154,7 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     message = await resp.message()
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
-
+    view.registered_members = get_fake_members()  # print("del")
     if len(view.registered_members) < 8:
         await message.edit(
             embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
@@ -182,6 +181,44 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     await message.edit(embed=embed)
 
     await ctx.app.game_session_manager.start_session(ctx.guild_id, session, view.registered_members)
+
+
+@battlefront.command
+@lightbulb.option("player", "The player to remove", type=hikari.Member, required=True)
+@lightbulb.option(
+    "messageid", "Id of the message the start component is on", type=str, required=True, min_length=18, max_length=19
+)
+@lightbulb.command("unregister", description="(BETA) Force remove a player from registration", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def removeplayer(ctx: BattlefrontBotSlashContext, messageid: str, player: hikari.Member) -> None:
+    if not is_admin(ctx.member):
+        await ctx.respond_with_failure("**Only a server administrator can do this**", ephemeral=True)
+        return
+
+    try:
+        id = int(messageid)
+    except ValueError:
+        await ctx.respond_with_failure("**Invalid message id provided**", ephemeral=True)
+        return
+
+    view: CapsRegisterView = ctx.app.miru_client.get_bound_view(id)
+    if view is None or not isinstance(view, CapsRegisterView):
+        await ctx.respond_with_failure("**No registration component found at provided message**", ephemeral=True)
+        return
+
+    if not any(player.id == m.id for m in view.registered_members):
+        await ctx.respond_with_failure("**This player is not already in the queue**", ephemeral=True)
+        return
+
+    for m in view.registered_members:
+        if player.id == m.id:
+            view.registered_members.pop(view.registered_members.index(m))
+
+    view.embed.remove_field(0)
+    if len(view.registered_members) > 1:
+        await view.update_embed()
+
+    await ctx.respond_with_success("**Removed player from queue**", ephemeral=True)
 
 
 @battlefront.command
@@ -278,34 +315,30 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int) -> N
     elif index == 3:
         possible_maps = [map for map in MAPS if MAPS[map] > 2]
     else:
-        await ctx.respond_with_failure(
-            "Index must be between 1-3 indicating the minimum required rotation depth", edit=True
-        )
-        return
+        return  # Should be enforced by discord
 
+    maps = []
+    urls = []
     if not amount:
         amount = 1
+
     for i in range(0, amount):
-        game_map = possible_maps[randint(0, len(possible_maps) - 1)]
-        img_path = os.path.join(ctx.app.base_dir, "src", "static", "img", game_map.lower().replace(" ", "_") + ".jpg")
+        rand_map = possible_maps[randint(0, len(possible_maps) - 1)]
+        maps.append(rand_map)
+        urls.append(os.path.join(ctx.app.base_dir, "src", "static", "img", rand_map.lower().replace(" ", "_") + ".jpg"))
 
-        embed = hikari.Embed(title=game_map, colour=DEFAULT_EMBED_COLOUR).set_image(img_path)
+    if len(maps) == 1:
+        embed = hikari.Embed(title=maps[0], colour=DEFAULT_EMBED_COLOUR).set_image(urls[0])
+        await ctx.edit_last_response("", embed=embed)
+        return
 
-        if i == 0:
-            await ctx.edit_last_response("", embed=embed)
-        else:
-            await ctx.respond("", embed=embed)
-
-
-async def maps_autocomplete(
-    option: hikari.interactions.command_interactions.AutocompleteInteractionOption,
-    interaction: hikari.interactions.command_interactions.AutocompleteInteraction,
-) -> list[str]:
-    return [map for map in MAPS if MAPS[map] != 0]
+    await ctx.edit_last_response(
+        f"Chosen maps: **{', '.join(map for map in maps)}**", attachments=[url for url in urls]
+    )
 
 
 @battlefront.command
-@lightbulb.option("name", "Name of the map", type=str, required=True, autocomplete=maps_autocomplete)
+@lightbulb.option("name", "Name of the map", type=str, required=True, choices=[map for map in MAPS if MAPS[map] != 0])
 @lightbulb.command("map", description="Get a map", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def getmap(ctx: BattlefrontBotSlashContext, name: str) -> None:

@@ -294,11 +294,11 @@ class CapsVotingView(miru.View):
                 self.stop()
                 return
 
-            await ctx.respond("You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
         self.votes[ctx.user.id] = 1
-        await ctx.respond("Your vote for team 1 was counted", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team 1 was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
         if len(self.votes) == 8:
             self.stop()
@@ -311,11 +311,11 @@ class CapsVotingView(miru.View):
                 self.stop()
                 return
 
-            await ctx.respond("You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
         self.votes[ctx.user.id] = 2
-        await ctx.respond("Your vote for team 2 was counted", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team 2 was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
         if len(self.votes) == 8:
             self.stop()
@@ -328,11 +328,11 @@ class CapsVotingView(miru.View):
                 self.stop()
                 return
 
-            await ctx.respond("You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
         self.votes[ctx.user.id] = 3
-        await ctx.respond("Your vote for team 3 was counted", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team 3 was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
         if len(self.votes) == 8:
             self.stop()
@@ -345,11 +345,11 @@ class CapsVotingView(miru.View):
                 self.stop()
                 return
 
-            await ctx.respond("You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
         self.votes[ctx.user.id] = 4
-        await ctx.respond("Your vote for team 4 was counted", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team 4 was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
         if len(self.votes) == 8:
             self.stop()
@@ -362,7 +362,7 @@ class CapsVotingView(miru.View):
 
         if self.override and ctx.user.id == self.overriding_user:
             await ctx.respond(
-                "You are already overriding the votes, vote above to finalise :point_up:",
+                f"{FAIL_EMOJI} You are already overriding the votes, vote above to finalise :point_up:",
                 flags=hikari.MessageFlag.EPHEMERAL,
             )
             return
@@ -377,7 +377,9 @@ class CapsVotingView(miru.View):
     @miru.button(emoji="🔁", style=hikari.ButtonStyle.DANGER)
     async def regen(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if self.author and self.author != ctx.user.id and not is_admin(ctx.member):
-            await ctx.respond("You are not allowed to override this action", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                f"{SUCCESS_EMOJI} You are not allowed to override this action", flags=hikari.MessageFlag.EPHEMERAL
+            )
             return
 
         await ctx.respond(
@@ -422,19 +424,26 @@ class CapsRegisterView(miru.View):
             await self.message.edit(components=self)
         self.stop()
 
+    async def update_embed(self) -> None:
+        self.embed.add_field(name="Players", value="\n".join([user.display_name for user in self.registered_members]))
+        await self.message.edit(embed=self.embed)
+
     @miru.button(label="Register", style=hikari.ButtonStyle.PRIMARY)
     async def confirm_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if ctx.member in self.registered_members:
-            await ctx.respond("You are already registered for this event", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                f"{FAIL_EMOJI} You are already registered for this event", flags=hikari.MessageFlag.EPHEMERAL
+            )
             return
 
         self.registered_members.append(ctx.member)
-        await ctx.respond("Thank you for registering :heart_hands:", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(
+            f"{SUCCESS_EMOJI} Thank you for registering :heart_hands:", flags=hikari.MessageFlag.EPHEMERAL
+        )
 
         if len(self.registered_members) > 1:
             self.embed.remove_field(0)
-        self.embed.add_field(name="Players", value="\n".join([user.display_name for user in self.registered_members]))
-        await self.message.edit(embed=self.embed)
+        await self.update_embed()
 
         if len(self.registered_members) == 8:
             self.stop()
@@ -442,20 +451,24 @@ class CapsRegisterView(miru.View):
     @miru.button(label="Leave", style=hikari.ButtonStyle.PRIMARY)
     async def leave_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if ctx.member not in self.registered_members:
-            await ctx.respond("You are not already registered", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(f"{FAIL_EMOJI} You are not already registered", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
         self.registered_members.remove(ctx.member)
-        await ctx.respond("You have been removed", flags=hikari.MessageFlag.EPHEMERAL)
+        await ctx.respond(f"{SUCCESS_EMOJI} You have been removed", flags=hikari.MessageFlag.EPHEMERAL)
 
         self.embed.remove_field(0)
-        self.embed.add_field(name="Players", value="\n".join([user.display_name for user in self.registered_members]))
-        await self.message.edit(embed=self.embed)
+        if len(self.registered_members) > 1:
+            await self.update_embed()
+        else:
+            await self.message.edit(embed=self.embed)
 
     @miru.button(emoji="🗑️", style=hikari.ButtonStyle.DANGER)
     async def stop_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if self.author and self.author != ctx.user.id and not is_admin(ctx.member):
-            await ctx.respond("You are not allowed to stop this action", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                f"{FAIL_EMOJI} You are not allowed to stop this action", flags=hikari.MessageFlag.EPHEMERAL
+            )
             return
 
         self.stop()
@@ -499,7 +512,9 @@ class RetryView(miru.View):
     @miru.button(emoji="🔄", style=hikari.ButtonStyle.PRIMARY)
     async def retry_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
         if self.author and self.author != ctx.user.id:
-            await ctx.respond("You are not allowed to retry this action", flags=hikari.MessageFlag.EPHEMERAL)
+            await ctx.respond(
+                f"{FAIL_EMOJI} You are not allowed to retry this action", flags=hikari.MessageFlag.EPHEMERAL
+            )
             return
 
         self.value = True

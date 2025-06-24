@@ -19,7 +19,7 @@ FAIL_EMBED_COLOUR: hikari.Colour = hikari.Colour(0x9C251C)
 
 SUCCESS_EMOJI: str = "<:confirm:1219174344203436042>"
 FAIL_EMOJI: str = "<:cancel:1219185372710572092>"
-LOADING_EMOJI: str = "<a:loading:1220563982499451042>"
+LOADING_EMOJI: str = "<a:loadingbf2:1387019740513308712>"
 
 INVITE_LINK_TEMPLATE: str = "https://discord.com/oauth2/authorize?client_id={}&permissions=563224831838208&integration_type=0&scope=bot+applications.commands"
 GITHUB_LINK: str = "https://github.com/bbombss/BattlefrontLeagueBot"
