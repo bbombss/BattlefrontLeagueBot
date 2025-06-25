@@ -4,10 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Improve caching">
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Optimisations and error handling improvements">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/extensions/errorhandler.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/errorhandler.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/game_session_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session_manager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/static/const.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/const.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -178,15 +181,7 @@
       <option name="project" value="LOCAL" />
       <updated>1750771824167</updated>
     </task>
-    <task id="LOCAL-00012" summary="Improve caching">
-      <option name="closed" value="true" />
-      <created>1750832743987</created>
-      <option name="number" value="00012" />
-      <option name="presentableId" value="LOCAL-00012" />
-      <option name="project" value="LOCAL" />
-      <updated>1750832743987</updated>
-    </task>
-    <option name="localTasksCounter" value="13" />
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -214,7 +209,6 @@
     <MESSAGE value="Fix interaction issues in registration, map commands added" />
     <MESSAGE value="Prep for deployment" />
     <MESSAGE value="Optimisations and error handling improvements" />
-    <MESSAGE value="Improve caching" />
-    <option name="LAST_COMMIT_MESSAGE" value="Improve caching" />
+    <option name="LAST_COMMIT_MESSAGE" value="Optimisations and error handling improvements" />
   </component>
 </project>
