@@ -4,33 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Prep for deployment">
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Improve caching">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/poetry.lock" beforeDir="false" afterPath="$PROJECT_DIR$/poetry.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/extensions/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/admin.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/extensions/errorhandler.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/errorhandler.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/views.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/const.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/const.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/ajan_kloss.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/ajan_kloss.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/bespin_palace.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/bespin_palace.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/death_star_ii.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/death_star_ii.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/endor_research_station.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/endor_research_station.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/geonosis_dreadnought.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/geonosis_dreadnought.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/hoth_outpost_delta.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/hoth_outpost_delta.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/jabbas_palace.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/jabbas_palace.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/jakku_the_graveyard.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/jakku_the_graveyard.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/kamino_cloning_facility.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/kamino_cloning_facility.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/kessel_coaxium_mine.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/kessel_coaxium_mine.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/naboo_palace.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/naboo_palace.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/resurgent_star_destroyer.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/resurgent_star_destroyer.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/scariff_beach.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/scariff_beach.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/takodana_castle.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/takodana_castle.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/takodana_mc85.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/takodana_mc85.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/tatooine_mos_eisley.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/tatooine_mos_eisley.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/yavin_4.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/yavin_4.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/game_session_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session_manager.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -193,7 +170,23 @@
       <option name="project" value="LOCAL" />
       <updated>1750682506108</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="Optimisations and error handling improvements">
+      <option name="closed" value="true" />
+      <created>1750771824167</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1750771824167</updated>
+    </task>
+    <task id="LOCAL-00012" summary="Improve caching">
+      <option name="closed" value="true" />
+      <created>1750832743987</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1750832743987</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -220,6 +213,8 @@
     <MESSAGE value="Add leaderboard command" />
     <MESSAGE value="Fix interaction issues in registration, map commands added" />
     <MESSAGE value="Prep for deployment" />
-    <option name="LAST_COMMIT_MESSAGE" value="Prep for deployment" />
+    <MESSAGE value="Optimisations and error handling improvements" />
+    <MESSAGE value="Improve caching" />
+    <option name="LAST_COMMIT_MESSAGE" value="Improve caching" />
   </component>
 </project>

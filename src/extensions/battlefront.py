@@ -19,15 +19,16 @@ from src.utils import is_admin
 battlefront = BattlefrontBotPlugin("battlefront")
 battlefront.add_checks(lightbulb.checks.guild_only)  # ToDo: Check bot is in channel + error handler
 
-
+# ToDo: Force end session
 # For testing
 class Fakemember:
     """Fake member object used for testing."""
 
-    def __init__(self, id, display_name, role_ids):
+    def __init__(self, id, display_name, role_ids, guild_id):
         self.id = id
         self.display_name = display_name
         self.role_ids = role_ids
+        self.guild_id = guild_id
 
 
 def get_fake_members() -> list[Fakemember]:
@@ -39,6 +40,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108414937993338,
             ],
+            1042398810707591209
         ),
         Fakemember(
             2,
@@ -46,6 +48,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108414937993338,
             ],
+            1042398810707591209
         ),
         Fakemember(
             3,
@@ -53,6 +56,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108414937993338,
             ],
+            1042398810707591209
         ),
         Fakemember(
             4,
@@ -60,6 +64,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108482516488343,
             ],
+            1042398810707591209
         ),
         Fakemember(
             5,
@@ -67,6 +72,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108482516488343,
             ],
+            1042398810707591209
         ),
         Fakemember(
             6,
@@ -74,6 +80,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108535478095883,
             ],
+            1042398810707591209
         ),
         Fakemember(
             7,
@@ -81,12 +88,15 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108535478095883,
             ],
+            1042398810707591209
         ),
         Fakemember(
             8,
             "fake8",
             [],
+            1042398810707591209
         ),
+
     ]
 
 
@@ -154,7 +164,7 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     message = await resp.message()
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
-    view.registered_members = get_fake_members()  # print("del")
+
     if len(view.registered_members) < 8:
         await message.edit(
             embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
@@ -217,6 +227,8 @@ async def removeplayer(ctx: BattlefrontBotSlashContext, messageid: str, player: 
     view.embed.remove_field(0)
     if len(view.registered_members) > 1:
         await view.update_embed()
+    else:
+        await view.message.edit(embed=view.embed)
 
     await ctx.respond_with_success("**Removed player from queue**", ephemeral=True)
 
@@ -391,6 +403,16 @@ async def forcestart(
 
     await ctx.respond_with_success("**Started a match with forced teams**", ephemeral=True)
     await ctx.app.game_session_manager.start_session(ctx.guild_id, session, players, force=True)
+
+
+@battlefront.command
+@lightbulb.command("flushcache", description="Clear the player cache for this server")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def flushcache(ctx: BattlefrontBotSlashContext) -> None:
+    await ctx.wait()
+
+    ctx.app.game_session_manager.player_cache.clear_guild(ctx.guild_id)
+    await ctx.respond_with_success("**Flushed guild player cache**")
 
 
 @battlefront.command

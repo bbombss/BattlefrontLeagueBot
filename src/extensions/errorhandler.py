@@ -167,6 +167,8 @@ async def application_command_error_handler(event: lightbulb.CommandErrorEvent) 
         await ctx.app.rest.create_message(ctx.channel_id, embed=embed)
     except hikari.ForbiddenError:
         pass
+    except hikari.NotFoundError:
+        pass
 
 
 @errorhandler.listener(lightbulb.PrefixCommandErrorEvent)

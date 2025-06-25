@@ -16,11 +16,16 @@ class PlayerCache:
     def __init__(self):
         self._cache = {}
 
-    def get(self, member_id: hikari.Snowflake) -> GamePlayer | None:
-        return self._cache.get(member_id)
+    def get(self, user_id: hikari.Snowflake, guild_id: hikari.Snowflake) -> GamePlayer | None:
+        return self._cache.get((user_id, guild_id))
 
-    def set(self, member_id: hikari.Snowflake, player: GamePlayer) -> None:
-        self._cache[member_id] = player
+    def set(self, user_id: hikari.Snowflake, player: GamePlayer) -> None:
+        self._cache[(user_id, player.member.guild_id)] = player
+
+    def clear_guild(self, guild_id: hikari.Snowflake) -> None:
+        for key in self._cache:
+            if key[1] == guild_id:
+                self._cache.pop(key)
 
 
 class GameSessionManager:
