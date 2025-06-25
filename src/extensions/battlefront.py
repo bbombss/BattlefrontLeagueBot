@@ -154,7 +154,7 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     message = await resp.message()
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
-    view.registered_members = get_fake_members()  # print("del")
+
     if len(view.registered_members) < 8:
         await message.edit(
             embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
@@ -217,6 +217,8 @@ async def removeplayer(ctx: BattlefrontBotSlashContext, messageid: str, player: 
     view.embed.remove_field(0)
     if len(view.registered_members) > 1:
         await view.update_embed()
+    else:
+        await view.message.edit(embed=view.embed)
 
     await ctx.respond_with_success("**Removed player from queue**", ephemeral=True)
 
@@ -391,6 +393,16 @@ async def forcestart(
 
     await ctx.respond_with_success("**Started a match with forced teams**", ephemeral=True)
     await ctx.app.game_session_manager.start_session(ctx.guild_id, session, players, force=True)
+
+
+@battlefront.command
+@lightbulb.command("flushcache", description="Clear the player cache for this server")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def flushcache(ctx: BattlefrontBotSlashContext) -> None:
+    await ctx.wait()
+
+    ctx.app.game_session_manager.player_cache.clear_guild(ctx.guild_id)
+    await ctx.respond_with_success("**Flushed guild player cache**")
 
 
 @battlefront.command

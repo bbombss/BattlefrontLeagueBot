@@ -192,6 +192,23 @@ class SessionContext:
         """Create a response with loading a message."""
         return await self.respond(f"{LOADING_EMOJI} Waiting for server...")
 
+    async def warn(self, content: str) -> hikari.Message:
+        """Send a warning message.
+
+        Parameters
+        ----------
+        content : str
+            The content of the warning.
+
+        Returns
+        -------
+        hikari.Message
+            The created message.
+
+        """
+        embed = hikari.Embed(description=f":warning: **Warning:** {content}", colour=WARN_EMBED_COLOUR)
+        return await self.app.rest.create_message(self.channel, embed=embed)
+
     async def retry(
         self, *args, author: hikari.Snowflake | None = None, timeout: float = 60, edit: bool = False, **kwargs
     ) -> bool:
@@ -404,7 +421,7 @@ class GameSession:
             "3": hikari.Snowflake(record["rank3role"]),
         }
 
-    async def _get_player_object(self, member: hikari.Member) -> GamePlayer | None:
+    async def _get_player_object(self, member: hikari.Member) -> GamePlayer:
         """Get a GamePlayer object for this member.
 
         Parameters
@@ -414,8 +431,8 @@ class GameSession:
 
         Returns
         -------
-        GamePlayer | None
-            A GamePlayer object that corresponds the member or None if one cannot be obtained.
+        GamePlayer
+            A GamePlayer object that corresponds to the member.
 
         """
         rank_role: int | None = None
@@ -432,14 +449,8 @@ class GameSession:
                 break
 
         if not rank_role:
-            self._session_manager._sessions.pop(self.ctx.guild.id)
-            await self.ctx.respond(
-                hikari.Embed(
-                    description=f"{FAIL_EMOJI} **Member {member.display_name} does not have a rank role aborting**",
-                    colour=FAIL_EMBED_COLOUR,
-                )
-            )
-            return
+            rank_role = 1
+            await self.ctx.warn(f"Assigned rank 1 to {member.display_name} because they do not have a rank role")
 
         game_player = GamePlayer(member, member.display_name, rank_role)
         self.ctx.app.game_session_manager.player_cache.set(member.id, game_player)
@@ -457,7 +468,7 @@ class GameSession:
         players: list[GamePlayer] = []
 
         for member in members:
-            cache_result = self._session_manager.player_cache.get(member.id)
+            cache_result = self._session_manager.player_cache.get(member.id, member.guild_id)
             if cache_result:
                 players.append(cache_result)
                 continue
@@ -708,9 +719,6 @@ class GameSession:
 
         await self._fetch_rank_roles()
         await self._get_players(members)
-
-        if any(p is None for p in self.players):
-            return
 
         if not force:
             proposed_matches = self._generate_team_pairs()
