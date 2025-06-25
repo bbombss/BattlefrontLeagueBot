@@ -114,6 +114,13 @@ async def application_command_error_handler(event: lightbulb.CommandErrorEvent) 
         )
         return
 
+    if isinstance(error, lightbulb.CheckFailure):
+        await ctx.respond_with_failure(
+            "**Failed a pre-command check** *Is the bot in this channel?*",
+            ephemeral=True,
+        )
+        return
+
     if isinstance(error, lightbulb.CommandInvocationError):
         if isinstance(error.original, hikari.InternalServerError):
             await ctx.respond_with_failure(

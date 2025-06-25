@@ -1,8 +1,11 @@
 import os
+from collections import Counter
+from itertools import islice
 from random import randint
 
 import hikari
 import lightbulb
+import miru
 
 from src.models import (
     BattleFrontBot,
@@ -11,13 +14,14 @@ from src.models import (
     CapsRegisterView,
     DatabaseMember,
     GameSession,
+    MapVotingView,
     SessionContext,
 )
 from src.static import *
-from src.utils import is_admin
+from src.utils import can_respond, is_admin
 
 battlefront = BattlefrontBotPlugin("battlefront")
-battlefront.add_checks(lightbulb.checks.guild_only)  # ToDo: Check bot is in channel + error handler
+battlefront.add_checks(lightbulb.checks.guild_only, lightbulb.Check(can_respond, can_respond))
 
 
 # For testing
@@ -40,7 +44,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108414937993338,
             ],
-            1042398810707591209
+            1042398810707591209,
         ),
         Fakemember(
             2,
@@ -48,7 +52,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108414937993338,
             ],
-            1042398810707591209
+            1042398810707591209,
         ),
         Fakemember(
             3,
@@ -56,7 +60,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108414937993338,
             ],
-            1042398810707591209
+            1042398810707591209,
         ),
         Fakemember(
             4,
@@ -64,7 +68,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108482516488343,
             ],
-            1042398810707591209
+            1042398810707591209,
         ),
         Fakemember(
             5,
@@ -72,7 +76,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108482516488343,
             ],
-            1042398810707591209
+            1042398810707591209,
         ),
         Fakemember(
             6,
@@ -80,7 +84,7 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108535478095883,
             ],
-            1042398810707591209
+            1042398810707591209,
         ),
         Fakemember(
             7,
@@ -88,15 +92,9 @@ def get_fake_members() -> list[Fakemember]:
             [
                 1384108535478095883,
             ],
-            1042398810707591209
+            1042398810707591209,
         ),
-        Fakemember(
-            8,
-            "fake8",
-            [],
-            1042398810707591209
-        ),
-
+        Fakemember(8, "fake8", [], 1042398810707591209),
     ]
 
 
@@ -266,7 +264,7 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
     embed = hikari.Embed(
         title=player.display_name,
         description=f"**Wins:** {db_member.wins}\n**Loses:** {db_member.loses}\n"
-        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins)), 3)}",
+        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins + db_member.ties)), 3)}",
         colour=DEFAULT_EMBED_COLOUR,
     )
     embed.set_thumbnail(player.avatar_url)
@@ -287,27 +285,41 @@ async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
 
     guild_members = await ctx.app.rest.fetch_members(ctx.guild_id)  # Better off making one bulk call then many
 
-    members = {}
+    member_wins = {}
+    member_wl = {}
     for record in records:
         if record["wins"] == 0:
             continue
 
         for member in guild_members:
             if member.id == record["userid"]:
-                members[member] = record["wins"]
+                member_wins[member] = record["wins"]
+                member_wl[member] = round((record["wins"] / (record["loses"] + record["wins"] + record["ties"])), 3)
 
-    if len(members) == 0:
+    if len(member_wins) == 0:
         await ctx.respond_with_failure("**This server has no stats**", edit=True)
         return
 
-    if len(members) > 10:
-        members = members[:10]
-    members = dict(sorted(members.items(), key=lambda item: item[1], reverse=True))
+    member_wins = dict(sorted(member_wins.items(), key=lambda item: item[1], reverse=True))
+    member_wl = dict(sorted(member_wl.items(), key=lambda item: item[1], reverse=True))
+    if len(member_wins) > 10:
+        member_wins = dict(islice(member_wins.items(), 10))
+        member_wl = dict(islice(member_wl.items(), 10))
 
     embed = hikari.Embed(
-        title="LeaderBoard (Wins)",
-        description="\n".join(f"**{member.display_name}:** {members[member]}" for member in members),
+        title="LeaderBoard",
+        description="",
         colour=DEFAULT_EMBED_COLOUR,
+    )
+    embed.add_field(
+        name="Wins",
+        value="\n".join(f"**{member.display_name}:** {member_wins[member]}" for member in member_wins),
+        inline=True,
+    )
+    embed.add_field(
+        name="Win/Loss Ratio",
+        value="\n".join(f"**{member.display_name}:** {member_wl[member]}" for member in member_wl),
+        inline=True,
     )
     await ctx.edit_last_response("", embed=embed)
 
@@ -344,8 +356,30 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int) -> N
         await ctx.edit_last_response("", embed=embed)
         return
 
+    options = [miru.SelectOption(map, value=map) for map in maps]
+    view = MapVotingView(timeout=30)
+    view.get_item_by_id("mapvoteselect").options = options
+
+    msg = await ctx.edit_last_response(
+        f"Vote for a map: **{', '.join(map for map in maps)}**", attachments=[url for url in urls], components=view
+    )
+
+    ctx.app.miru_client.start_view(view, bind_to=msg)
+    await view.wait()
+
+    if len(view.votes) < 1:
+        return
+
+    vote_counts = Counter(view.votes.values())
+    winner_vote, winner_count = vote_counts.most_common(1)[0]
+
+    url = os.path.join(ctx.app.base_dir, "src", "static", "img", winner_vote.lower().replace(" ", "_") + ".jpg")
     await ctx.edit_last_response(
-        f"Chosen maps: **{', '.join(map for map in maps)}**", attachments=[url for url in urls]
+        "",
+        embed=hikari.Embed(title=f"{winner_vote} won with {winner_count} votes", colour=DEFAULT_EMBED_COLOUR).set_image(
+            url
+        ),
+        components=[],
     )
 
 
@@ -412,7 +446,7 @@ async def flushcache(ctx: BattlefrontBotSlashContext) -> None:
     await ctx.wait()
 
     ctx.app.game_session_manager.player_cache.clear_guild(ctx.guild_id)
-    await ctx.respond_with_success("**Flushed guild player cache**")
+    await ctx.respond_with_success("**Flushed guild player cache**", edit=True)
 
 
 @battlefront.command
@@ -420,14 +454,21 @@ async def flushcache(ctx: BattlefrontBotSlashContext) -> None:
 @lightbulb.implements(lightbulb.SlashCommand)
 async def endsession(ctx: BattlefrontBotSlashContext) -> None:
     session = ctx.app.game_session_manager.fetch_session(ctx.guild_id)
-    if not session or not session.session_task:
+    if not session:
         await ctx.respond_with_failure("**Could not find a game session for this server**", ephemeral=True)
         return
+
     if session.ctx.author.id != ctx.author.id and not is_admin(ctx.member):
         await ctx.respond_with_failure("**You cannot end this session**", ephemeral=True)
         return
 
+    if not session.session_task:
+        ctx.app.game_session_manager._sessions.pop(ctx.guild_id)
+        await ctx.respond_with_failure("**Could not connect to session but ended it anyway**", ephemeral=True)
+        return
+
     ctx.app.game_session_manager.end_session(ctx.guild_id)
+
     await ctx.respond_with_success("**Ended session successfully**", ephemeral=True)
 
 

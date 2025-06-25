@@ -625,7 +625,7 @@ class GameSession:
 
             self.event.clear()
             try:
-                await asyncio.wait_for(self.event.wait(), timeout=2048)
+                await asyncio.wait_for(self.event.wait(), timeout=3000)
             except asyncio.TimeoutError:
                 timeout = True
                 self._session_task = None

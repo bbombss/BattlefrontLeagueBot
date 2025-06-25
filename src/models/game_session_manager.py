@@ -123,8 +123,8 @@ class GameSessionManager:
             The guild id for the session that is being ended is bound to.
 
         """
-        self._sessions.pop(guild_id)
         self.fetch_session(guild_id).end()
+        self._sessions.pop(guild_id)
 
 
 # Copyright (C) 2025 BBombs

@@ -391,6 +391,36 @@ class CapsVotingView(miru.View):
         self.stop()
 
 
+class MapVotingView(miru.View):
+    """View for prompting users to vote for a map."""
+
+    def __init__(
+        self,
+        timeout: float = 30,
+    ) -> None:
+        """View for prompting a users to vote for teams.
+
+        Parameters
+        ----------
+        timeout : float
+            Timeout for view, defaults to 30.
+
+        """
+        super().__init__(timeout=timeout)
+        self.votes: dict[hikari.Snowflake, str] = {}
+
+    @miru.text_select(
+        options=[miru.SelectOption(label="Loading")], placeholder="Vote for a Map", custom_id="mapvoteselect"
+    )
+    async def map_selector(self, ctx: miru.ViewContext, select: miru.TextSelect) -> None:
+        self.votes[ctx.user.id] = select.values[0]
+
+        await ctx.respond(f"{SUCCESS_EMOJI} Your vote was counted", flags=hikari.MessageFlag.EPHEMERAL)
+
+        if len(self.votes) == 8:
+            self.stop()
+
+
 class CapsRegisterView(miru.View):
     """View for prompting users to register for caps."""
 

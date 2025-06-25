@@ -1,8 +1,21 @@
 from __future__ import annotations
 
+import typing as t
+
 import hikari
 import hikari.guilds
 import lightbulb
+
+if t.TYPE_CHECKING:
+    from src.models.context import BattlefrontBotSlashContext
+
+
+async def can_respond(ctx: BattlefrontBotSlashContext) -> bool:
+    try:
+        await ctx.app.rest.fetch_channel(ctx.channel_id)
+    except hikari.ForbiddenError:
+        return False
+    return True
 
 
 def is_admin(member: hikari.Member) -> bool:
