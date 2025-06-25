@@ -348,6 +348,7 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int) -> N
 
     for i in range(0, amount):
         rand_map = possible_maps[randint(0, len(possible_maps) - 1)]
+        possible_maps.remove(rand_map)
         maps.append(rand_map)
         urls.append(os.path.join(ctx.app.base_dir, "src", "static", "img", rand_map.lower().replace(" ", "_") + ".jpg"))
 

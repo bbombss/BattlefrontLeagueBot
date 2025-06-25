@@ -2,7 +2,7 @@ __all__ = ["MAPS", "TEAM_NAME_KEY_1", "TEAM_NAME_KEY_2"]
 
 # Map name, index (distance from banned map)
 MAPS: dict[str, int] = {
-    "Scariff Beach": 8,
+    "Scarifff Beach": 8,
     "Kamino Cloning Facility": 7,
     "Tatooine Mos Eisley": 6,
     "Naboo Palace": 5,
