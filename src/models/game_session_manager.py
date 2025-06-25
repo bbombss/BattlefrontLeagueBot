@@ -17,10 +17,10 @@ class PlayerCache:
         self._cache = {}
 
     def get(self, user_id: hikari.Snowflake, guild_id: hikari.Snowflake) -> GamePlayer | None:
-        return self._cache.get([user_id, guild_id])
+        return self._cache.get((user_id, guild_id))
 
     def set(self, user_id: hikari.Snowflake, player: GamePlayer) -> None:
-        self._cache[[user_id, player.member.guild_id]] = player
+        self._cache[(user_id, player.member.guild_id)] = player
 
     def clear_guild(self, guild_id: hikari.Snowflake) -> None:
         for key in self._cache:
@@ -123,8 +123,8 @@ class GameSessionManager:
             The guild id for the session that is being ended is bound to.
 
         """
-        self.fetch_session(guild_id).end()
         self._sessions.pop(guild_id)
+        self.fetch_session(guild_id).end()
 
 
 # Copyright (C) 2025 BBombs

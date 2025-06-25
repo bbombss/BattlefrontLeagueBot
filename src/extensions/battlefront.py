@@ -19,7 +19,7 @@ from src.utils import is_admin
 battlefront = BattlefrontBotPlugin("battlefront")
 battlefront.add_checks(lightbulb.checks.guild_only)  # ToDo: Check bot is in channel + error handler
 
-# ToDo: Force end session
+
 # For testing
 class Fakemember:
     """Fake member object used for testing."""
