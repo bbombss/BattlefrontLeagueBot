@@ -124,7 +124,18 @@ class GameSessionManager:
 
         """
         self.fetch_session(guild_id).end()
-        self._sessions.pop(guild_id)
+
+    def remove_session(self, guild_id: hikari.Snowflake) -> None:
+        """Remove a session from the game session manager if it exists.
+
+        Parameters
+        ----------
+        guild_id : hikari.Snowflake
+            The guild id for the session that is being removed is bound to.
+
+        """
+        if self.fetch_session(guild_id):
+            self._sessions.pop(guild_id)
 
 
 # Copyright (C) 2025 BBombs

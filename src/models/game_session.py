@@ -28,6 +28,12 @@ def create_team_name() -> str:
     return name
 
 
+def ellipsize(s: str, width: int) -> str:
+    if len(s) <= width:
+        return s
+    return s[: width - 3] + "..."
+
+
 class GamePlayer:
     """Player object for GameSessions."""
 
@@ -92,6 +98,54 @@ class GameMatch:
         self.round2_scores: list[int] | None = None
         self.winner: GameTeam | None = None
         self.final_scores: list[int] | None = None
+
+
+def format_team_voting_embed(matches_group: list[GameMatch]) -> tuple[hikari.Embed, list[str]]:
+    """Create a formatted embed with the provided matches.
+
+    Parameters
+    ----------
+    matches_group : list[GameMatch]
+       A list of 4 matches for players to vote on.
+
+    Returns
+    -------
+    tuple[hikari.Embed, list[str]]
+        Tuple containing the resulting embed and all it's fields.
+
+    """
+    embed = hikari.Embed(
+        title="Team Voting",
+        description="Vote for your team now below :point_down:",
+        colour=DEFAULT_EMBED_COLOUR,
+    )
+
+    all_lefts = []
+    for match in matches_group:
+        for p in match.team1.players:
+            all_lefts.append(f"0| {p.name}")
+
+    max_left_width = max(len(s) for s in all_lefts)
+    cutoff = min(max_left_width, 24)
+    fields = []
+
+    for i, match in enumerate(matches_group, 1):
+        lines = []
+
+        for left, right in zip(match.team1.players, match.team2.players):
+            left_str = f"{left.role}| {left.name}"
+            right_str = f"{right.role}| {right.name}"
+
+            left_trunc = ellipsize(left_str, cutoff).ljust(cutoff)
+            right_trunc = ellipsize(right_str, cutoff)
+            lines.append(f"{left_trunc} {right_trunc}")
+
+        teams = f"**{match.team1.name}** - vs - **{match.team2.name}**```{'\n'.join(lines)}```"
+        embed.add_field(name=f"Teams {i}", value=teams)
+        fields.append(teams)
+
+    embed.set_footer("Waiting for votes... (5min)")
+    return embed, fields
 
 
 class SessionContext:
@@ -245,17 +299,28 @@ class SessionContext:
         await view.wait()
         return view.value
 
-    async def team_vote(self, timeout: float = 300, edit: bool = False, **kwargs) -> int | None:
+    async def team_vote(
+        self,
+        players: list[hikari.Member],
+        embed: hikari.Embed,
+        fields: list[str],
+        timeout: float = 300,
+        edit: bool = False,
+    ) -> int | None:
         """Poll players for their team preference and returns the winning vote.
 
         Parameters
         ----------
+        players : list[hikari.Member]
+            The players in the teams.
+        embed : hikari.Embed
+            The team voting embed.
+        fields : list[str]
+            Each of the fields in the embed.
         timeout : float
             Timeout for view, defaults to 30.
         edit : bool
             Whether the original response should be edited, defaults to False.
-        kwargs : Any
-            Keyword arguments passed to the message builder.
 
         Returns
         -------
@@ -263,12 +328,12 @@ class SessionContext:
             Returns the winning vote or None if there were no votes and 5 for a reset.
 
         """
-        view = CapsVotingView(author=self.author.id, timeout=timeout)
+        view = CapsVotingView(players, embed, fields, author=self.author.id, timeout=timeout)
 
         if edit:
-            msg = await self.edit_last_response("", components=view, **kwargs)
+            msg = await self.edit_last_response("", components=view, embed=embed)
         else:
-            msg = await self.respond(components=view, **kwargs)
+            msg = await self.respond(components=view, embed=embed)
 
         self._last_response = msg
         self.app.miru_client.start_view(view, bind_to=msg)
@@ -281,7 +346,7 @@ class SessionContext:
         winner_vote, winner_count = vote_counts.most_common(1)[0]
         return winner_vote
 
-    async def update_round(self, round_no: int, match: GameMatch) -> hikari.Message:
+    async def update_round(self, round_no: int, match: GameMatch, map: str | None = None) -> hikari.Message:
         """Update the round information embed with the latest round information.
 
         Parameters
@@ -290,6 +355,8 @@ class SessionContext:
             The round number.
         match : GameMatch
             The game match with the latest information.
+        map : str | None
+            A url to the map for this match or None if there is no map.
 
         Returns
         -------
@@ -326,6 +393,7 @@ class SessionContext:
             inline=True,
         )
         embed.set_footer("Waiting for scores..." if round_no < 3 else "Session finished")
+        embed.set_image(map)
 
         if match.round1_winner:
             if match.round1_scores[0] == match.round1_scores[1]:
@@ -375,6 +443,7 @@ class GameSession:
         self._latest_score: dict[GameTeam, int]
         self._match: GameMatch
         self._event = asyncio.Event()
+        self._map: str | None = None
 
     @property
     def ctx(self) -> SessionContext:
@@ -551,44 +620,25 @@ class GameSession:
 
         while True:  # lol
             iter += 1
-            match_index = iter - 1 if iter < 5 else 3
 
-            embed = hikari.Embed(
-                title="Team Voting",
-                description="Vote for your team now below :point_down:",
-                colour=DEFAULT_EMBED_COLOUR,
+            embed, fields = format_team_voting_embed(matches_groups[iter - 1 if iter < 5 else 3])
+
+            winner_vote = await self.ctx.team_vote(
+                [player.member for player in self._players], embed, fields, edit=True
             )
 
-            for i, match in enumerate(matches_groups[match_index], 1):
-                embed.add_field(
-                    name=f"Team {i}",
-                    value=f"**{match.team1.name}** - vs - **{match.team2.name}**\n"
-                    f"{match.team1.players[0].name} ({match.team1.players[0].role}) - - "
-                    f"{match.team2.players[0].name} ({match.team2.players[0].role})\n"
-                    f"{match.team1.players[1].name} ({match.team1.players[1].role}) - - "
-                    f"{match.team2.players[1].name} ({match.team2.players[1].role})\n"
-                    f"{match.team1.players[2].name} ({match.team1.players[2].role}) - - "
-                    f"{match.team2.players[2].name} ({match.team2.players[2].role})\n"
-                    f"{match.team1.players[3].name} ({match.team1.players[3].role}) - - "
-                    f"{match.team2.players[3].name} ({match.team2.players[3].role})",
-                    inline=False,
-                )
-            embed.set_footer("Waiting for votes... (5min)")
-
-            winner_vote = await self.ctx.team_vote(edit=True, embed=embed)
-
             if not winner_vote:
-                self._session_manager._sessions.pop(self.ctx.guild.id)
                 embed = hikari.Embed(description=f"{FAIL_EMOJI} **No-one voted for a team**", colour=FAIL_EMBED_COLOUR)
 
                 if iter > 5:
+                    self._session_manager.remove_session(self.ctx.guild.id)
                     await self.ctx.edit_last_response(embed=embed, components=[])
                     return
 
                 if await self.ctx.retry(author=self.ctx.author.id, edit=True, embed=embed):
-                    self._session_manager._sessions[self.ctx.guild.id] = self
                     continue
 
+                self._session_manager.remove_session(self.ctx.guild.id)
                 return
 
             if winner_vote == 5:
@@ -621,7 +671,7 @@ class GameSession:
                 self._match.round1_winner = team1 if self._latest_score[0] > self._latest_score[1] else team2
                 self._match.round1_scores = [self._latest_score[0], self._latest_score[1]]
 
-            await self.ctx.update_round(round_no, self._match)
+            await self.ctx.update_round(round_no, self._match, map=self._map)
 
             self.event.clear()
             try:
@@ -633,7 +683,7 @@ class GameSession:
 
         # Check if rounds were completed
         if sum([team1_score, team2_score]) == 0 or round_no < 3:
-            self._session_manager._sessions.pop(self.ctx.guild.id)
+            self._session_manager.remove_session(self.ctx.guild.id)
             embed = hikari.Embed(
                 description=f"{FAIL_EMOJI} **Session was ended{' due to a timeout' if timeout else ''}**",
                 colour=FAIL_EMBED_COLOUR,
@@ -650,9 +700,9 @@ class GameSession:
         self._match.winner = winning_team
         self._match.final_scores = [team1_score, team2_score]
 
-        await self.ctx.update_round(round_no, self._match)
+        await self.ctx.update_round(round_no, self._match, map=self._map)
 
-        self._session_manager._sessions.pop(self.ctx.guild.id)
+        self._session_manager.remove_session(self.ctx.guild.id)
 
         # Update db
         query = """
@@ -698,6 +748,17 @@ class GameSession:
 
         self._latest_score = [score1, score2]
         self.event.set()
+
+    def set_map(self, map: str) -> None:
+        """Add a map to this session.
+
+        Parameters
+        ----------
+        map : str
+            The url for the map to add.
+
+        """
+        self._map = map
 
     def end(self) -> None:
         """End the game loop."""

@@ -40,7 +40,7 @@ def get_fake_members() -> list[Fakemember]:
     return [
         Fakemember(
             1,
-            "fake1",
+            "bubbleBee30",
             [
                 1384108414937993338,
             ],
@@ -48,7 +48,7 @@ def get_fake_members() -> list[Fakemember]:
         ),
         Fakemember(
             2,
-            "fake2",
+            "gangkid2",
             [
                 1384108414937993338,
             ],
@@ -56,7 +56,7 @@ def get_fake_members() -> list[Fakemember]:
         ),
         Fakemember(
             3,
-            "fake3",
+            "Treehugs533",
             [
                 1384108414937993338,
             ],
@@ -64,7 +64,7 @@ def get_fake_members() -> list[Fakemember]:
         ),
         Fakemember(
             4,
-            "fake4",
+            "Dolphinlover6",
             [
                 1384108482516488343,
             ],
@@ -72,7 +72,7 @@ def get_fake_members() -> list[Fakemember]:
         ),
         Fakemember(
             5,
-            "fake5",
+            "bighay458",
             [
                 1384108482516488343,
             ],
@@ -80,7 +80,7 @@ def get_fake_members() -> list[Fakemember]:
         ),
         Fakemember(
             6,
-            "fake6",
+            "massiveballer2013",
             [
                 1384108535478095883,
             ],
@@ -88,13 +88,13 @@ def get_fake_members() -> list[Fakemember]:
         ),
         Fakemember(
             7,
-            "fake7",
+            "sigmamalemember2",
             [
                 1384108535478095883,
             ],
             1042398810707591209,
         ),
-        Fakemember(8, "fake8", [], 1042398810707591209),
+        Fakemember(8, "robot3", [], 1042398810707591209),
     ]
 
 
@@ -312,7 +312,7 @@ async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
         colour=DEFAULT_EMBED_COLOUR,
     )
     embed.add_field(
-        name="Wins",
+        name="Wins ------------ ",
         value="\n".join(f"**{member.display_name}:** {member_wins[member]}" for member in member_wins),
         inline=True,
     )
@@ -357,8 +357,12 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int) -> N
         await ctx.edit_last_response("", embed=embed)
         return
 
+    players = None
+    if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
+        players = [p.member for p in session.players]
+
     options = [miru.SelectOption(map, value=map) for map in maps]
-    view = MapVotingView(timeout=30)
+    view = MapVotingView(players=players, timeout=60)
     view.get_item_by_id("mapvoteselect").options = options
 
     msg = await ctx.edit_last_response(
@@ -369,6 +373,7 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int) -> N
     await view.wait()
 
     if len(view.votes) < 1:
+        await ctx.respond_with_failure("No one voted", edit=True)
         return
 
     vote_counts = Counter(view.votes.values())
@@ -377,11 +382,14 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int) -> N
     url = os.path.join(ctx.app.base_dir, "src", "static", "img", winner_vote.lower().replace(" ", "_") + ".jpg")
     await ctx.edit_last_response(
         "",
-        embed=hikari.Embed(title=f"{winner_vote} won with {winner_count} votes", colour=DEFAULT_EMBED_COLOUR).set_image(
-            url
-        ),
+        embed=hikari.Embed(
+            title=f"{winner_vote} won with {winner_count}/{len(view.votes)} votes", colour=DEFAULT_EMBED_COLOUR
+        ).set_image(url),
         components=[],
     )
+
+    if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
+        session.set_map(url)
 
 
 @battlefront.command
@@ -395,6 +403,9 @@ async def getmap(ctx: BattlefrontBotSlashContext, name: str) -> None:
     embed = hikari.Embed(title=name, colour=DEFAULT_EMBED_COLOUR).set_image(img_path)
 
     await ctx.edit_last_response("", embed=embed)
+
+    if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
+        session.set_map(img_path)
 
 
 @battlefront.command
@@ -464,11 +475,12 @@ async def endsession(ctx: BattlefrontBotSlashContext) -> None:
         return
 
     if not session.session_task:
-        ctx.app.game_session_manager._sessions.pop(ctx.guild_id)
+        ctx.app.game_session_manager.remove_session(ctx.guild_id)
         await ctx.respond_with_failure("**Could not connect to session but ended it anyway**", ephemeral=True)
         return
 
     ctx.app.game_session_manager.end_session(ctx.guild_id)
+    ctx.app.game_session_manager.remove_session(ctx.guild_id)  # Just in case
 
     await ctx.respond_with_success("**Ended session successfully**", ephemeral=True)
 

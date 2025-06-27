@@ -267,13 +267,22 @@ class CapsVotingView(miru.View):
 
     def __init__(
         self,
+        players: list[hikari.Member],
+        embed: hikari.Embed,
+        fields: list[str],
         author: hikari.Snowflake | None = None,
         timeout: float = 30,
-    ):
+    ) -> None:
         """View for prompting a users to vote for teams.
 
         Parameters
         ----------
+        players : list[hikari.Member]
+            The players in the teams.
+        embed : hikari.Embed
+            The team voting embed.
+        fields : list[str]
+            Each of the fields in the embed.
         author : hikari.Snowflake | None
             An author id, if given only the author can override, defaults to None.
         timeout : float
@@ -282,77 +291,65 @@ class CapsVotingView(miru.View):
         """
         super().__init__(timeout=timeout)
         self.author = author
+        self.players = players
+        self.embed = embed
+        self.fields = fields
+
         self.votes: dict[hikari.Snowflake, int] = {}
         self.override: bool = False
         self.overriding_user: hikari.Snowflake
 
-    @miru.button("1", style=hikari.ButtonStyle.PRIMARY)
-    async def vote_1(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+    async def _update_embed(self) -> None:
+        for i in range(4):
+            self.embed.remove_field(0)
+
+        for i, field in enumerate(self.fields, 1):
+            votes = len([vote for vote in self.votes.values() if vote == i])
+            self.embed.add_field(name=f"Teams {i}{f' ({votes} votes)' if votes > 0 else ''}", value=field)
+
+        if len(self.votes) > 4:
+            waiting_on = [p.display_name for p in self.players if p.id not in self.votes]
+            self.embed.set_footer(f"Waiting for {', '.join(waiting_on)}")
+
+        await self.message.edit(embed=self.embed)
+
+    async def _handle_vote(self, vote: int, ctx: miru.ViewContext) -> None:
         if self.override:
             if ctx.user.id == self.overriding_user:
-                self.votes[ctx.user.id] = 1
+                self.votes[ctx.user.id] = vote
                 self.stop()
                 return
 
             await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
-        self.votes[ctx.user.id] = 1
-        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team 1 was counted", flags=hikari.MessageFlag.EPHEMERAL)
+        if ctx.member not in self.players:
+            await ctx.respond(f"{FAIL_EMOJI} You cannot vote", flags=hikari.MessageFlag.EPHEMERAL)
+            return
+
+        self.votes[ctx.user.id] = vote
+        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team {vote} was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
         if len(self.votes) == 8:
             self.stop()
+
+        await self._update_embed()
+
+    @miru.button("1", style=hikari.ButtonStyle.PRIMARY)
+    async def vote_1(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        await self._handle_vote(1, ctx)
 
     @miru.button("2", style=hikari.ButtonStyle.PRIMARY)
     async def vote_2(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        if self.override:
-            if ctx.user.id == self.overriding_user:
-                self.votes[ctx.user.id] = 2
-                self.stop()
-                return
-
-            await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
-            return
-
-        self.votes[ctx.user.id] = 2
-        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team 2 was counted", flags=hikari.MessageFlag.EPHEMERAL)
-
-        if len(self.votes) == 8:
-            self.stop()
+        await self._handle_vote(2, ctx)
 
     @miru.button("3", style=hikari.ButtonStyle.PRIMARY)
     async def vote_3(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        if self.override:
-            if ctx.user.id == self.overriding_user:
-                self.votes[ctx.user.id] = 3
-                self.stop()
-                return
-
-            await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
-            return
-
-        self.votes[ctx.user.id] = 3
-        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team 3 was counted", flags=hikari.MessageFlag.EPHEMERAL)
-
-        if len(self.votes) == 8:
-            self.stop()
+        await self._handle_vote(3, ctx)
 
     @miru.button("4", style=hikari.ButtonStyle.PRIMARY)
     async def vote_4(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        if self.override:
-            if ctx.user.id == self.overriding_user:
-                self.votes[ctx.user.id] = 4
-                self.stop()
-                return
-
-            await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
-            return
-
-        self.votes[ctx.user.id] = 4
-        await ctx.respond(f"{SUCCESS_EMOJI} Your vote for team 4 was counted", flags=hikari.MessageFlag.EPHEMERAL)
-
-        if len(self.votes) == 8:
-            self.stop()
+        await self._handle_vote(4, ctx)
 
     @miru.button(emoji="⚖️", style=hikari.ButtonStyle.DANGER)
     async def override(self, ctx: miru.ViewContext, button: miru.Button) -> None:
@@ -396,18 +393,29 @@ class MapVotingView(miru.View):
 
     def __init__(
         self,
+        players: list[hikari.Member] | None = None,
         timeout: float = 30,
     ) -> None:
         """View for prompting a users to vote for teams.
 
         Parameters
         ----------
+        players : list[hikari.Member] | None
+            If provided the players that are voting on a map.
         timeout : float
             Timeout for view, defaults to 30.
 
         """
         super().__init__(timeout=timeout)
+        self.players = players
         self.votes: dict[hikari.Snowflake, str] = {}
+
+        self.status_message: hikari.Message | None = None
+
+    async def on_timeout(self) -> None:
+        if self.status_message:
+            await self.status_message.delete()
+        self.stop()
 
     @miru.text_select(
         options=[miru.SelectOption(label="Loading")], placeholder="Vote for a Map", custom_id="mapvoteselect"
@@ -418,7 +426,13 @@ class MapVotingView(miru.View):
         await ctx.respond(f"{SUCCESS_EMOJI} Your vote was counted", flags=hikari.MessageFlag.EPHEMERAL)
 
         if len(self.votes) == 8:
+            if self.status_message:
+                await self.status_message.delete()
             self.stop()
+
+        elif len(self.votes) > 4 and self.players:
+            waiting_on = [p.display_name for p in self.players if p.id not in self.votes]
+            self.status_message = await ctx.respond(f"Waiting for {', '.join(waiting_on)}")
 
 
 class CapsRegisterView(miru.View):

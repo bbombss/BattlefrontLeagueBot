@@ -4,10 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Map voting, leaderboad changes, pre-command checks">
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Hotfix for randmap command">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/battlefront.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/scariff_beach.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/scarifff_beach.jpg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/game_session_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session_manager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -186,7 +188,15 @@
       <option name="project" value="LOCAL" />
       <updated>1750857342573</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="Hotfix for randmap command">
+      <option name="closed" value="true" />
+      <created>1750860247050</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1750860247050</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -215,6 +225,7 @@
     <MESSAGE value="Prep for deployment" />
     <MESSAGE value="Optimisations and error handling improvements" />
     <MESSAGE value="Map voting, leaderboad changes, pre-command checks" />
-    <option name="LAST_COMMIT_MESSAGE" value="Map voting, leaderboad changes, pre-command checks" />
+    <MESSAGE value="Hotfix for randmap command" />
+    <option name="LAST_COMMIT_MESSAGE" value="Hotfix for randmap command" />
   </component>
 </project>
