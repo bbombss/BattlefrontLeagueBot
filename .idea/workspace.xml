@@ -4,12 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Hotfix for randmap command">
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Team voting changes, map commands now interface with sessions">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/game_session_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session_manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/views.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -196,7 +192,15 @@
       <option name="project" value="LOCAL" />
       <updated>1750860247050</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="Team voting changes, map commands now interface with sessions">
+      <option name="closed" value="true" />
+      <created>1751035513308</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1751035513308</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -226,6 +230,7 @@
     <MESSAGE value="Optimisations and error handling improvements" />
     <MESSAGE value="Map voting, leaderboad changes, pre-command checks" />
     <MESSAGE value="Hotfix for randmap command" />
-    <option name="LAST_COMMIT_MESSAGE" value="Hotfix for randmap command" />
+    <MESSAGE value="Team voting changes, map commands now interface with sessions" />
+    <option name="LAST_COMMIT_MESSAGE" value="Team voting changes, map commands now interface with sessions" />
   </component>
 </project>

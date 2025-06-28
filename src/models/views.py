@@ -432,6 +432,9 @@ class MapVotingView(miru.View):
 
         elif len(self.votes) > 4 and self.players:
             waiting_on = [p.display_name for p in self.players if p.id not in self.votes]
+            if self.status_message:
+                await self.status_message.edit(f"Waiting for {', '.join(waiting_on)}")
+                return
             self.status_message = await ctx.respond(f"Waiting for {', '.join(waiting_on)}")
 
 
