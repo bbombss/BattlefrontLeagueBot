@@ -162,7 +162,7 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     message = await resp.message()
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
-    view.registered_members = get_fake_members()  # del
+
     if len(view.registered_members) < 8:
         await message.edit(
             embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
@@ -283,7 +283,7 @@ async def leaderboard(ctx: BattlefrontBotSlashContext, guildid: str | None) -> N
     guild_id = ctx.guild_id
     if guildid:
         if ctx.author.id not in ctx.app.owner_ids:
-            await ctx.respond_with_failure("Access Denied (private records)", edit=True)
+            await ctx.respond_with_failure("**Access Denied (private records)**", edit=True)
             return
         guild_id = int(guildid)
 
