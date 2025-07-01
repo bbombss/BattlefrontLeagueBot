@@ -323,7 +323,7 @@ class CapsVotingView(miru.View):
             await ctx.respond(f"{FAIL_EMOJI} You can no longer vote", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
-        if ctx.member not in self.players:
+        if ctx.member.id not in [p.id for p in self.players]:
             await ctx.respond(f"{FAIL_EMOJI} You cannot vote", flags=hikari.MessageFlag.EPHEMERAL)
             return
 

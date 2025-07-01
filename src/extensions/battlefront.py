@@ -162,7 +162,7 @@ async def startcaps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     message = await resp.message()
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
-
+    view.registered_members = get_fake_members()  # del
     if len(view.registered_members) < 8:
         await message.edit(
             embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
@@ -249,7 +249,6 @@ async def capsresult(ctx: BattlefrontBotSlashContext, team1score: int, team2scor
     await ctx.respond_with_success("**Added score to session successfully**", ephemeral=True)
 
 
-@battlefront.command
 @lightbulb.option("player", "The player", type=hikari.Member, required=True)
 @lightbulb.command("career", description="Shows a players stats", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -273,17 +272,28 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
 
 @battlefront.command
 @lightbulb.add_cooldown(30, 1, lightbulb.buckets.GuildBucket)
+@lightbulb.option(
+    "guildid", "Fetch leaderboard for this guild", type=str, required=False, min_length=18, max_length=19
+)
 @lightbulb.command("leaderboard", description="Shows the leaderboard for this server", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
-async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
+async def leaderboard(ctx: BattlefrontBotSlashContext, guildid: str | None) -> None:
     await ctx.wait()
-    records = await ctx.app.db.fetch("SELECT * FROM members WHERE guildId = $1", ctx.guild_id)
+
+    guild_id = ctx.guild_id
+    if guildid:
+        if ctx.author.id not in ctx.app.owner_ids:
+            await ctx.respond_with_failure("Access Denied (private records)", edit=True)
+            return
+        guild_id = int(guildid)
+
+    records = await ctx.app.db.fetch("SELECT * FROM members WHERE guildId = $1", guild_id)
 
     if not records:
         await ctx.respond_with_failure("**This server has no stats**", edit=True)
         return
 
-    guild_members = await ctx.app.rest.fetch_members(ctx.guild_id)  # Better off making one bulk call then many
+    guild_members = await ctx.app.rest.fetch_members(guild_id)  # Better off making one bulk call then many
 
     member_wins = {}
     member_wl = {}
@@ -325,6 +335,7 @@ async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
 
 
 @battlefront.command
+@lightbulb.add_cooldown(60, 3, lightbulb.buckets.GuildBucket)
 @lightbulb.option("amount", "Amount of maps to generate", type=int, required=False, min_value=1, max_value=3)
 @lightbulb.option("index", "Map index", type=int, required=True, min_value=1, max_value=3)
 @lightbulb.command("randmap", description="Picks a random map", pass_options=True)
@@ -393,6 +404,7 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int) -> N
 
 
 @battlefront.command
+@lightbulb.add_cooldown(60, 3, lightbulb.buckets.GuildBucket)
 @lightbulb.option("name", "Name of the map", type=str, required=True, choices=[map for map in MAPS if MAPS[map] != 0])
 @lightbulb.command("map", description="Get a map", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
