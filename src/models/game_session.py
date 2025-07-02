@@ -778,6 +778,7 @@ class GameSession:
         """
         self._id = self._session_manager.session_count
 
+        self._session_manager.player_cache.check_cache(self.ctx.guild.id)
         await self._fetch_rank_roles()
         await self._get_players(members)
 

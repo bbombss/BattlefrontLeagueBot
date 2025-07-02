@@ -249,6 +249,7 @@ async def capsresult(ctx: BattlefrontBotSlashContext, team1score: int, team2scor
     await ctx.respond_with_success("**Added score to session successfully**", ephemeral=True)
 
 
+@battlefront.command
 @lightbulb.option("player", "The player", type=hikari.Member, required=True)
 @lightbulb.command("career", description="Shows a players stats", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -272,9 +273,7 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
 
 @battlefront.command
 @lightbulb.add_cooldown(30, 1, lightbulb.buckets.GuildBucket)
-@lightbulb.option(
-    "guildid", "Fetch leaderboard for this guild", type=str, required=False, min_length=18, max_length=19
-)
+@lightbulb.option("guildid", "Fetch leaderboard for this guild", type=str, required=False, min_length=18, max_length=19)
 @lightbulb.command("leaderboard", description="Shows the leaderboard for this server", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def leaderboard(ctx: BattlefrontBotSlashContext, guildid: str | None) -> None:
@@ -447,17 +446,19 @@ async def forcestart(
         return
 
     record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
-    assert record is not None
-    if record["rank1role"] is None or record["rank2role"] is None or record["rank3role"] is None:
+    if not record or None in record.values():
         await ctx.respond_with_failure(
             "Could not find rank roles for server, use `/roles` to configure rank roles", ephemeral=True
         )
         return
 
+    players = [player1, player2, player3, player4, player5, player6, player7, player8]
+    if len({m.id for m in players}) != len(players):
+        await ctx.respond_with_failure("**Duplicate users were given** each player must be unique", ephemeral=True)
+        return
+
     game_context = SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member)
     session = GameSession(game_context)
-
-    players = [player1, player2, player3, player4, player5, player6, player7, player8]
 
     await ctx.respond_with_success("**Started a match with forced teams**", ephemeral=True)
     await ctx.app.game_session_manager.start_session(ctx.guild_id, session, players, force=True)

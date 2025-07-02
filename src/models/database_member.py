@@ -83,6 +83,14 @@ class DatabaseMember(DatabaseModel):
             ties=record["ties"],
         )
 
+    async def remove(self) -> None:
+        await self._db.execute(
+            """
+            DELETE FROM members WHERE userId = $1
+            """,
+            self.id,
+        )
+
 
 # Copyright (C) 2025 BBombs
 

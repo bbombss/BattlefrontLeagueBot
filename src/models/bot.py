@@ -13,6 +13,7 @@ import miru
 from src.config import Config
 from src.models.context import *
 from src.models.database import Database
+from src.models.database_member import DatabaseMember
 from src.models.errors import ApplicationStateError
 from src.models.game_session_manager import GameSessionManager
 from src.static import DEFAULT_EMBED_COLOUR
@@ -143,6 +144,7 @@ class BattleFrontBot(lightbulb.BotApp):
         self.subscribe(hikari.GuildJoinEvent, self.on_guild_join)
         self.subscribe(hikari.GuildLeaveEvent, self.on_guild_leave)
         self.subscribe(hikari.StoppedEvent, self.on_stop)
+        self.subscribe(hikari.MemberDeleteEvent, self.on_member_leave)
 
         super().run(activity=hikari.Activity(name="Star Wars Battlefront II", type=hikari.ActivityType.PLAYING))
 
@@ -239,6 +241,11 @@ Make sure to set the rank roles using `/roles`""",
     async def on_guild_leave(self, event: hikari.GuildLeaveEvent) -> None:
         await self.db.remove_guild(event.guild_id)
         logger.info(f"BattleFrontBot removed from guild: {event.guild_id}")
+
+    async def on_member_leave(self, event: hikari.MemberDeleteEvent) -> None:
+        user = await DatabaseMember.fetch(event.user, event.guild_id)
+        await user.remove()
+        logger.info(f"User removed from guild: {event.user.display_name} - {event.guild_id}")
 
     async def on_stop(self, event: hikari.StoppedEvent) -> None:
         self._is_started = False
