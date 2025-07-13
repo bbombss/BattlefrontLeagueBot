@@ -71,7 +71,7 @@ async def handle_exception(ctx, error: Exception) -> None:
         The exception to handle
 
     """
-    title = f"{FAIL_EMOJI} {error.__class__.__name__}: {error}"
+    title = f"{FAIL_EMOJI} {error.__class__.__name__}"
     content = "\n".join(traceback.format_exception(type(error), error, error.__traceback__))
 
     await respond_paginated(ctx, content, "```py\n", "```", title=title, colour=FAIL_EMBED_COLOUR)
@@ -108,7 +108,7 @@ async def ext_unload(ctx: BattlefrontBotPrefixContext, extension: str) -> None:
 @lightbulb.command("sync", "Sync application commands")
 @lightbulb.implements(lightbulb.PrefixCommand)
 async def sync_commands(ctx: BattlefrontBotPrefixContext) -> None:
-    await ctx.wait()
+    await ctx.loading()
     await ctx.app.sync_application_commands()
     await ctx.respond_with_success("**Synced application commands**", edit=True)
 
@@ -118,15 +118,15 @@ async def sync_commands(ctx: BattlefrontBotPrefixContext) -> None:
 @lightbulb.command("stopview", "Stop a view bound to a message", pass_options=True)
 @lightbulb.implements(lightbulb.PrefixCommand)
 async def stop_view(ctx: BattlefrontBotPrefixContext, messageid: str) -> None:
-    await ctx.wait()
+    await ctx.loading()
 
     try:
-        id = int(messageid)
+        message_id = int(messageid)
     except ValueError:
         await ctx.respond_with_failure("**Invalid message id provided**", edit=True)
         return
 
-    view = ctx.app.miru_client.get_bound_view(id)
+    view = ctx.app.miru_client.get_bound_view(message_id)
     if view is None:
         await ctx.respond_with_failure("**No component found at provided message**", edit=True)
         return
@@ -134,6 +134,77 @@ async def stop_view(ctx: BattlefrontBotPrefixContext, messageid: str) -> None:
     view.stop()
 
     await ctx.respond_with_success("**Stopped the view**", edit=True)
+
+
+@admin.command
+@lightbulb.option(
+    "description", "Description of changes", required=True, modifier=lightbulb.OptionModifier.CONSUME_REST
+)
+@lightbulb.option("link", "Link to detailed changes", required=True)
+@lightbulb.command("changelog", "Send a changelog to all the bots servers", pass_options=True)
+@lightbulb.implements(lightbulb.PrefixCommand)
+async def changelog(ctx: BattlefrontBotPrefixContext, description: str, link: str) -> None:
+    await ctx.loading()
+
+    embed = hikari.Embed(
+        title=f":chart_with_upwards_trend: New in {ctx.app.version}",
+        description="BattlefrontBot has been upgraded with new features and fixes.",
+        colour=DEFAULT_EMBED_COLOUR,
+    )
+    embed.add_field(name="Changes", value=description.replace("`", "").strip())
+    component = ctx.app.rest.build_message_action_row()
+    component.add_link_button(link, label="Detailed Changes")
+    component.add_link_button(TRELLO_LINK, label="Trello")
+
+    cancel_msg = {
+        "embed": hikari.Embed(
+            title=None,
+            description=f"{FAIL_EMOJI} **Cancelled changelog**",
+            colour=FAIL_EMBED_COLOUR,
+        )
+    }
+    confirmation = await ctx.get_confirmation(
+        "Are you sure you want to send this changelog?", cancel_msg=cancel_msg, edit=True, embed=embed
+    )
+
+    if confirmation:
+        for guild in ctx.app.cache.get_guilds_view().values():
+            await ctx.app.rest.create_message(guild.system_channel_id, embed=embed, component=component)
+
+        await ctx.respond_with_success("**Changelog Sent**", edit=True)
+
+
+@admin.command
+@lightbulb.option("guildid", "Guild id", required=True)
+@lightbulb.command("getmembers", "Get a list of db members for any guild", pass_options=True)
+@lightbulb.implements(lightbulb.PrefixCommand)
+async def get_members(ctx: BattlefrontBotPrefixContext, guildid: str) -> None:
+    await ctx.loading()
+
+    try:
+        guild_id = int(guildid)
+    except ValueError:
+        await ctx.respond_with_failure("**Invalid message id provided**", edit=True)
+        return
+
+    records = await ctx.app.db.fetch("SELECT * FROM members WHERE guildId = $1 ORDER BY wins DESC", guild_id)
+
+    if not records:
+        await ctx.respond_with_failure("**This server has no stored members**", edit=True)
+        return
+
+    member_fields = []
+    for record in records:
+        member = ctx.app.cache.get_member(guild_id, record["userid"])
+        member_name = member.display_name if member else record["userid"]
+
+        member_fields.append([member_name, record["rank"], record["wins"], record["loses"], record["ties"]])
+
+    guild_members = "i| Name/ Id Rank Wins Loses Ties"
+    for i, fields in enumerate(member_fields, 1):
+        guild_members += f"\n{i}| {', '.join(str(field) for field in fields)}"
+
+    await respond_paginated(ctx, guild_members, prefix="```", suffix="```")
 
 
 @admin.command
@@ -146,7 +217,7 @@ async def stop_view(ctx: BattlefrontBotPrefixContext, messageid: str) -> None:
 @lightbulb.command("sql", "Execute sql command from message or file.", pass_options=True)
 @lightbulb.implements(lightbulb.PrefixCommand)
 async def eval_sql(ctx: BattlefrontBotPrefixContext, code: str) -> None:
-    await ctx.wait()
+    await ctx.loading()
 
     if ctx.attachments and ctx.attachments[0].filename.endswith(".sql"):
         sql = (await ctx.attachments[0].read()).decode()
@@ -165,7 +236,7 @@ async def eval_sql(ctx: BattlefrontBotPrefixContext, code: str) -> None:
 @lightbulb.command("eval", "Evaluate python code.", pass_options=True)
 @lightbulb.implements(lightbulb.PrefixCommand)
 async def eval_python(ctx: BattlefrontBotPrefixContext, code: str) -> None:
-    await ctx.wait()
+    await ctx.loading()
 
     globals_env = {
         "ctx": ctx,
@@ -174,6 +245,8 @@ async def eval_python(ctx: BattlefrontBotPrefixContext, code: str) -> None:
         "channel": ctx.get_channel(),
         "author": ctx.author,
         "message": ctx.event.message,
+        "hikari": hikari,
+        "lightbulb": lightbulb,
     }
 
     code = code.replace("```py", "").replace("`", "").strip()

@@ -7,6 +7,7 @@ __all__ = [
     "LOADING_EMOJI",
     "SUCCESS_EMBED_COLOUR",
     "SUCCESS_EMOJI",
+    "TRELLO_LINK",
     "WARN_EMBED_COLOUR",
 ]
 
@@ -23,6 +24,7 @@ LOADING_EMOJI: str = "<a:loadingbf2:1387019740513308712>"
 
 INVITE_LINK_TEMPLATE: str = "https://discord.com/oauth2/authorize?client_id={}&permissions=563224831838208&integration_type=0&scope=bot+applications.commands"
 GITHUB_LINK: str = "https://github.com/bbombss/BattlefrontLeagueBot"
+TRELLO_LINK: str = "https://bbo.ms/bf2bot"
 
 
 # Copyright (C) 2025 BBombs

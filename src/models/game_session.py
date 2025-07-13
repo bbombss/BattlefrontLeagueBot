@@ -29,6 +29,7 @@ def create_team_name() -> str:
 
 
 def ellipsize(s: str, width: int) -> str:
+    """Append an ellipse to strings greater than the defined width."""
     if len(s) <= width:
         return s
     return s[: width - 3] + "..."
@@ -242,7 +243,7 @@ class SessionContext:
 
         return msg
 
-    async def wait(self) -> hikari.Message:
+    async def loading(self) -> hikari.Message:
         """Create a response with loading a message."""
         return await self.respond(f"{LOADING_EMOJI} Waiting for server...")
 
@@ -436,7 +437,7 @@ class GameSession:
         """
         self._ctx = ctx
         self._players: list[GamePlayer]
-        self._rank_roles: dict[str, hikari.Snowflake]
+        self._rank_roles: dict[int, hikari.Snowflake]
         self._id: int
         self._session_task: asyncio.Task[t.Any] | None = None
         self._session_manager = ctx.app.game_session_manager
@@ -465,7 +466,7 @@ class GameSession:
         return self._id
 
     @property
-    def rank_roles(self) -> dict[str, hikari.Snowflake]:
+    def rank_roles(self) -> dict[int, hikari.Snowflake]:
         """The rank roles to identify player ranks for this session."""
         if self._rank_roles is None:
             raise GameSessionError("Session must be started to access property rank_roles")
@@ -485,9 +486,9 @@ class GameSession:
         """Fetch the rank role ids for this session from the database."""
         record = await self.ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", self.ctx.guild.id)
         self._rank_roles = {
-            "1": hikari.Snowflake(record["rank1role"]),
-            "2": hikari.Snowflake(record["rank2role"]),
-            "3": hikari.Snowflake(record["rank3role"]),
+            1: hikari.Snowflake(record["rank1role"]),
+            2: hikari.Snowflake(record["rank2role"]),
+            3: hikari.Snowflake(record["rank3role"]),
         }
 
     async def _get_player_object(self, member: hikari.Member) -> GamePlayer:
@@ -507,15 +508,10 @@ class GameSession:
         rank_role: int | None = None
 
         for role in member.role_ids:
-            if role == self.rank_roles["1"]:
-                rank_role = 1
-                break
-            elif role == self.rank_roles["2"]:
-                rank_role = 2
-                break
-            elif role == self.rank_roles["3"]:
-                rank_role = 3
-                break
+            for i in range(3):
+                if role == self.rank_roles[i]:
+                    rank_role = i
+                    break
 
         if not rank_role:
             rank_role = 1
@@ -614,14 +610,14 @@ class GameSession:
             The winning GameMatch or None if no match is voted for.
 
         """
-        await self.ctx.wait()
-        iter = 0
+        await self.ctx.loading()
+        i = 0
         matches_groups = [matches[:4], matches[4:8], matches[8:12], matches[12:16]]
 
-        while True:  # lol
-            iter += 1
+        while True:
+            i += 1
 
-            embed, fields = format_team_voting_embed(matches_groups[iter - 1 if iter < 5 else 3])
+            embed, fields = format_team_voting_embed(matches_groups[i - 1 if i < 5 else 3])
 
             winner_vote = await self.ctx.team_vote(
                 [player.member for player in self._players], embed, fields, edit=True
@@ -630,7 +626,7 @@ class GameSession:
             if not winner_vote:
                 embed = hikari.Embed(description=f"{FAIL_EMOJI} **No-one voted for a team**", colour=FAIL_EMBED_COLOUR)
 
-                if iter > 5:
+                if i > 5:
                     self._session_manager.remove_session(self.ctx.guild.id)
                     await self.ctx.edit_last_response(embed=embed, components=[])
                     return
@@ -644,7 +640,7 @@ class GameSession:
             if winner_vote == 5:
                 continue
 
-            return matches[((winner_vote + (4 * (iter - 1))) - 1)]
+            return matches[((winner_vote + (4 * (i - 1))) - 1)]  # Determine which match won factoring in match groups
 
     async def _wait_for_scores(self) -> None:
         """Start the game loop waiting for scores.
@@ -795,7 +791,7 @@ class GameSession:
             team2 = GameTeam([player for player in self.players[4:]], create_team_name(), 0)
             self._match = GameMatch(team1, team2)
 
-            await self.ctx.wait()
+            await self.ctx.loading()
 
         self._latest_score = [0, 0]
 

@@ -23,7 +23,7 @@ psutil.cpu_percent(interval=1)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def bot_info(ctx: BattlefrontBotSlashContext) -> None:
     start = perf_counter_ns()
-    await ctx.wait()
+    await ctx.loading()
     end = perf_counter_ns()
 
     tdelta = datetime.datetime.now() - ctx.app.start_time
