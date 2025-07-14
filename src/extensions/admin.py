@@ -1,10 +1,13 @@
 import asyncio
+import os
+import subprocess
 import traceback
 from contextlib import redirect_stdout
 from io import StringIO
 from textwrap import indent
 from time import perf_counter_ns
 
+import aiofiles
 import hikari
 import lightbulb
 
@@ -14,6 +17,7 @@ from src.models import (
     BattlefrontBotPrefixContext,
 )
 from src.static import *
+from src.utils import backup_db
 
 admin = BattlefrontBotPlugin("admin")
 admin.add_checks(lightbulb.owner_only)
@@ -205,6 +209,58 @@ async def get_members(ctx: BattlefrontBotPrefixContext, guildid: str) -> None:
         guild_members += f"\n{i}| {', '.join(str(field) for field in fields)}"
 
     await respond_paginated(ctx, guild_members, prefix="```", suffix="```")
+
+
+@admin.command
+@lightbulb.command("dbbackup", "Dumps the database and sends it to the bot owner")
+@lightbulb.implements(lightbulb.PrefixCommand)
+async def db_backup(ctx: BattlefrontBotPrefixContext) -> None:
+    await ctx.loading()
+
+    dump_file = await backup_db()
+    if not dump_file:
+        await ctx.respond_with_failure("**Database backup failed**", edit=True)
+        return
+
+    await ctx.author.send("Database backup:", attachment=dump_file)
+    await ctx.respond_with_success("**Database backup created and sent**", edit=True)
+
+
+@admin.command
+@lightbulb.command("dbrestore", "Restore the database from the attached file")
+@lightbulb.implements(lightbulb.PrefixCommand)
+async def db_restore(ctx: BattlefrontBotPrefixContext) -> None:
+    if not ctx.attachments or not ctx.attachments[0].filename.endswith(".pgdump"):
+        await ctx.respond_with_failure("A valid pgdump file was not provided")
+        return
+
+    await ctx.loading()
+
+    if not os.path.isdir(os.path.join(ctx.app.base_dir, "db_backups")):
+        os.mkdir(os.path.join(ctx.app.base_dir, "db_backups"))
+
+    dump_path = os.path.join(ctx.app.base_dir, "db_backups", "db_restore.pgdump")
+    async with aiofiles.open(dump_path, "wb") as file:
+        await file.write(await ctx.attachments[0].read())
+
+    # Drop all tables
+    async with ctx.app.db.pool.acquire() as con:
+        await con.execute("DROP SCHEMA public CASCADE;")
+        await con.execute("CREATE SCHEMA public;")
+        await con.execute("GRANT ALL ON SCHEMA public TO postgres;")
+
+    cmd = ["pg_restore", "-j", "4", "-d", ctx.app.db.dsn, dump_path]
+
+    try:
+        subprocess.run(cmd, stderr=subprocess.PIPE, check=True, text=True)
+    except subprocess.CalledProcessError as e:
+        await ctx.respond_with_failure(
+            f"**Database restore failed**\n!!! The database may be malformed\n```{e.stderr}```", edit=True
+        )
+        return
+
+    await ctx.app.db.migrate_schema()
+    await ctx.respond_with_success("**Database restore successful**", edit=True)
 
 
 @admin.command

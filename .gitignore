@@ -137,3 +137,7 @@ cython_debug/
 config.py
 
 .idea
+
+# DB Backups
+db_backups/
+.pdgdump
