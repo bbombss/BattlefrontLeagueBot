@@ -11,6 +11,14 @@ if t.TYPE_CHECKING:
 
 
 async def can_respond(ctx: BattlefrontBotSlashContext) -> bool:
+    """Will return true if the bot can send messages in the event channel.
+
+    Parameters
+    ----------
+    ctx : BattlefrontBotSlashContext
+        The context to check, will use the context channel for the check.
+
+    """
     try:
         await ctx.app.rest.fetch_channel(ctx.channel_id)
     except hikari.ForbiddenError:

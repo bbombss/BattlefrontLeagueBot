@@ -6,6 +6,7 @@ import asyncio
 import itertools
 import typing as t
 from collections import Counter
+from io import BytesIO
 from random import randint
 
 import hikari
@@ -16,6 +17,7 @@ if t.TYPE_CHECKING:
 from src.models.errors import *
 from src.models.views import CapsVotingView, RetryView
 from src.static import *
+from src.utils import generate_game_banner
 
 
 def create_team_name() -> str:
@@ -95,10 +97,10 @@ class GameMatch:
         self.team2 = team2
         self.round1_winner: GameTeam | None = None
         self.round2_winner: GameTeam | None = None
-        self.round1_scores: list[int] | None = None
-        self.round2_scores: list[int] | None = None
+        self.round1_scores: tuple[int] | None = None
+        self.round2_scores: tuple[int] | None = None
         self.winner: GameTeam | None = None
-        self.final_scores: list[int] | None = None
+        self.final_scores: tuple[int] | None = None
 
 
 def format_team_voting_embed(matches_group: list[GameMatch]) -> tuple[hikari.Embed, list[str]]:
@@ -422,6 +424,35 @@ class SessionContext:
 
         return await self.edit_last_response("", embed=embed, components=[])
 
+    async def match_summary(self, match: GameMatch) -> None:
+        """Send a match summary in the context channel.
+
+        Parameters
+        ----------
+        match : GameMatch
+            The completed game match.
+
+        """
+        if not match.winner:
+            raise GameSessionError("Cannot create a match summary for an incomplete match")
+
+        # Call generate_game_banner on a thread from the existing asyncio pool
+        b: BytesIO = await asyncio.get_running_loop().run_in_executor(
+            None,
+            generate_game_banner,
+            [match.team1.name, match.team2.name],
+            match.final_scores,
+            [player.name for player in match.winner.players],
+        )
+
+        await self.app.rest.create_message(
+            self.channel,
+            f"Congrats {' ,'.join([player.member.mention for player in match.winner.players])} for winning"
+            f"{match.final_scores[0] - match.final_scores[1]} against their opponents",
+            user_mentions=True,
+            attachment=hikari.Bytes(b.getvalue(), "banner.jpg"),
+        )
+
 
 class GameSession:
     """Session object that is used to track game progress and stats."""
@@ -508,7 +539,7 @@ class GameSession:
         rank_role: int | None = None
 
         for role in member.role_ids:
-            for i in range(3):
+            for i in range(1, 3):
                 if role == self.rank_roles[i]:
                     rank_role = i
                     break
@@ -640,7 +671,7 @@ class GameSession:
             if winner_vote == 5:
                 continue
 
-            return matches[((winner_vote + (4 * (i - 1))) - 1)]  # Determine which match won factoring in match groups
+            return matches[((winner_vote + (4 * (i - 1))) - 1)]  # Determine which match won by factoring in match group
 
     async def _wait_for_scores(self) -> None:
         """Start the game loop waiting for scores.
@@ -665,7 +696,7 @@ class GameSession:
                 team2_score += self._latest_score[1]
 
                 self._match.round1_winner = team1 if self._latest_score[0] > self._latest_score[1] else team2
-                self._match.round1_scores = [self._latest_score[0], self._latest_score[1]]
+                self._match.round1_scores = (self._latest_score[0], self._latest_score[1])
 
             await self.ctx.update_round(round_no, self._match, map=self._map)
 
@@ -692,9 +723,9 @@ class GameSession:
         winning_team = team1 if team1_score > team2_score else team2
 
         self._match.round2_winner = team1 if self._latest_score[0] > self._latest_score[1] else team2
-        self._match.round2_scores = [self._latest_score[0], self._latest_score[1]]
+        self._match.round2_scores = (self._latest_score[0], self._latest_score[1])
         self._match.winner = winning_team
-        self._match.final_scores = [team1_score, team2_score]
+        self._match.final_scores = (team1_score, team2_score)
 
         await self.ctx.update_round(round_no, self._match, map=self._map)
 
@@ -727,6 +758,8 @@ class GameSession:
             guild_ids = [self.ctx.guild.id] * 8
 
             await self.ctx.app.db.execute(query.format(*["0", "0", "1", "ties"]), player_ids, guild_ids)
+
+        await self.ctx.match_summary(self._match)
 
     def add_score(self, score1: int, score2: int) -> None:
         """Add a score to this session.

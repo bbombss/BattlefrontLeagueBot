@@ -4,13 +4,23 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Better admin management tools">
-      <change afterPath="$PROJECT_DIR$/src/utils/backup_db.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Added database backup functionality via app">
+      <change afterPath="$PROJECT_DIR$/src/static/font/emoji.ttf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/font/eras_itc_bold.ttf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/font/helvetika_bold.ttf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/font/mussels_black.ttf" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/static/img/winner_template.jpg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/utils/image_manipulation.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/poetry.lock" beforeDir="false" afterPath="$PROJECT_DIR$/poetry.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/extensions/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/admin.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/database_member.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/database_member.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/static/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/battlefront.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/utils/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/backup_db.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/backup_db.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/helpers.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/helpers.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,15 +61,19 @@
     "ASKED_ADD_EXTERNAL_FILES": "true",
     "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
     "Python.Main.executor": "Run",
+    "Python.backup_db.executor": "Run",
     "Python.config.executor": "Run",
+    "Python.image_manipulation.executor": "Run",
     "Python.test.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "git-widget-placeholder": "1.1.1",
-    "last_opened_file_path": "C:/Users/benho/Repositories/BBombsBot"
+    "last_opened_file_path": "C:/Users/benho/Repositories/drawtest"
   }
 }]]></component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\benho\Repositories\Battlefront2Bot\src\static\img" />
+      <recent name="C:\Users\benho\Repositories\Battlefront2Bot\src\static" />
       <recent name="C:\Users\benho\Repositories\Battlefront2Bot" />
       <recent name="C:\Users\benho\Repositories\Battlefront2Bot\src" />
     </key>
@@ -257,7 +271,15 @@
       <option name="project" value="LOCAL" />
       <updated>1752418009044</updated>
     </task>
-    <option name="localTasksCounter" value="20" />
+    <task id="LOCAL-00020" summary="Added database backup functionality via app">
+      <option name="closed" value="true" />
+      <created>1752505770912</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1752505770912</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -293,6 +315,7 @@
     <MESSAGE value="Not ideal" />
     <MESSAGE value="Improve caching, clean up unnecessary member records" />
     <MESSAGE value="Better admin management tools" />
-    <option name="LAST_COMMIT_MESSAGE" value="Better admin management tools" />
+    <MESSAGE value="Added database backup functionality via app" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added database backup functionality via app" />
   </component>
 </project>

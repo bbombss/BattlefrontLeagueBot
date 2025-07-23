@@ -42,6 +42,7 @@ dependencies = [
     "aiofiles (>=24.1.0,<25.0.0)",
     "uvloop (==0.19.0)",
     "hikari-miru (~=4.2.0)",
+    "Pillow (~=11.3.0)"
 ]
 optional-dependencies = { ruff = [ "ruff~=0.9.3" ] }
 

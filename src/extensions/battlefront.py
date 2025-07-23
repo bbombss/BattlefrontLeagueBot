@@ -24,7 +24,7 @@ battlefront = BattlefrontBotPlugin("battlefront")
 battlefront.add_checks(lightbulb.checks.guild_only, lightbulb.Check(can_respond, can_respond))
 
 
-# For testing
+# ToDo: Delete this
 class Fakemember:
     """Fake member object used for testing."""
 

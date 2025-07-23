@@ -1,7 +1,7 @@
+import asyncio
 import datetime
 import logging
 import os
-import subprocess
 from pathlib import Path
 
 import hikari
@@ -52,10 +52,13 @@ async def backup_db() -> hikari.File | None:
     ]
     env = {"PGPASSWORD": password, "SYSTEMROOT": os.environ["SYSTEMROOT"]}
 
-    try:
-        subprocess.run(cmd, stderr=subprocess.PIPE, text=True, check=True, env=env)
-    except subprocess.CalledProcessError as e:
-        logger.warning(f"Database backup failed:\n{e.stderr}")
+    p = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE, env=env)
+
+    result = await p.wait()
+    stdout, stderr = await p.communicate()
+
+    if result != 0:
+        logger.warning(f"Database backup failed:\n{stderr.decode('unicode_escape')}")
         return
 
     logger.info("A database backup was performed successfully")

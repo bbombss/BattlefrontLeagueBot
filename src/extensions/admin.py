@@ -1,6 +1,5 @@
 import asyncio
 import os
-import subprocess
 import traceback
 from contextlib import redirect_stdout
 from io import StringIO
@@ -251,11 +250,15 @@ async def db_restore(ctx: BattlefrontBotPrefixContext) -> None:
 
     cmd = ["pg_restore", "-j", "4", "-d", ctx.app.db.dsn, dump_path]
 
-    try:
-        subprocess.run(cmd, stderr=subprocess.PIPE, check=True, text=True)
-    except subprocess.CalledProcessError as e:
+    p = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE)
+
+    result = await p.wait()
+    stdout, stderr = await p.communicate()
+
+    if result != 0:
         await ctx.respond_with_failure(
-            f"**Database restore failed**\n!!! The database may be malformed\n```{e.stderr}```", edit=True
+            f"**Database restore failed**\n!!! The database may be malformed\n```{stderr.decode('unicode_escape')}```",
+            edit=True,
         )
         return
 
