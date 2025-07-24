@@ -151,6 +151,7 @@ def format_team_voting_embed(matches_group: list[GameMatch]) -> tuple[hikari.Emb
     return embed, fields
 
 
+# ToDo: Handle session message deletion
 class SessionContext:
     """Context object for GameSessions."""
 
@@ -447,8 +448,8 @@ class SessionContext:
 
         await self.app.rest.create_message(
             self.channel,
-            f"Congrats {' ,'.join([player.member.mention for player in match.winner.players])} for winning"
-            f"{match.final_scores[0] - match.final_scores[1]} against their opponents",
+            f"Congrats {', '.join([player.member.mention for player in match.winner.players])} for winning "
+            f"{match.final_scores[0]} - {match.final_scores[1]} against their opponents",
             user_mentions=True,
             attachment=hikari.Bytes(b.getvalue(), "banner.jpg"),
         )

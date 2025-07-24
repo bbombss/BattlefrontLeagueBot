@@ -1,14 +1,17 @@
+import logging
 import os
 from io import BytesIO
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
+logger = logging.getLogger(__name__)
 
-def generate_game_banner(team_names: list[str], score: tuple[int], winning_players: list[str]) -> BytesIO:
+
+def generate_game_banner(team_names: list[str], score: tuple[int, int], winning_players: list[str]) -> BytesIO:
     """Generate a game summary banner by formating the winner template with the provided values.
 
-    Should be run in a separate thread to prevent blocking.
+    Should be run in a separate task.
 
     Parameters
     ----------
@@ -26,50 +29,57 @@ def generate_game_banner(team_names: list[str], score: tuple[int], winning_playe
 
     """
     src_dir = str(Path(os.path.abspath(__file__)).parents[1])
+    buffer = BytesIO()
+
+    try:
+        img = Image.open(os.path.join(src_dir, "static", "img", "banner_template.jpg"))
+    except FileNotFoundError:
+        logger.error("Game banner template image 'src/static/img/banner_template.jpg' not found")
+        return buffer
 
     w, h = 1745, 769  # Image width, height
-    img = Image.open(os.path.join(src_dir, "static", "img", "winner_template.jpg"))
     template = ImageDraw.Draw(img)
 
     # Title text
-    mussels = ImageFont.truetype(os.path.join(src_dir, "static", "font", "mussels_black.ttf"), 100)
-    title1_colour = (0, 34, 56)
-    title1_length = template.textlength(team_names[0], mussels)
-    title1_position = ((w / 2 - title1_length) - 50, h / 2)
+    mussels = ImageFont.truetype(os.path.join(src_dir, "static", "font", "mussels_black.ttf"), 80)
+    title1_colour = (0, 29, 48)
+    title1_length = template.textlength(team_names[0].upper(), mussels)
+    title1_position = ((w / 2 - title1_length) - 40, h / 2)
 
-    title2_colour = (54, 0, 0)
-    title2_length = template.textlength(team_names[1], mussels)
-    title2_position = ((w / 2 + title2_length) + 50, h / 2)
+    title2_colour = (44, 0, 0)
+    title2_length = template.textlength(team_names[1].upper(), mussels)
+    title2_position = ((w / 2 + title2_length) + 40, h / 2)
 
     # Subtitle text
-    helvetica = ImageFont.truetype(os.path.join(src_dir, "static", "font", "helvetika_bold.ttf"), 36)
+    helvetica = ImageFont.truetype(os.path.join(src_dir, "static", "font", "helvetika_bold.ttf"), 30)
     subtitle_colour = (255, 255, 255)
-    subtitle_position = (w / 2, h / 2 + 150)
-    players_str = ", ".join(player for player in winning_players)
+    subtitle_position = (w / 2, h / 2 + 250)
+    players_str = "\n".join(player for player in winning_players)
 
     # Score text
     eras = ImageFont.truetype(os.path.join(src_dir, "static", "font", "eras_itc_bold.ttf"), 48)
-    score_colour = (0, 0, 0)
+    score_colour = (255, 255, 255)
     score_position = (w / 2, h / 2 - 225)
     score_str = f"{score[0]}  -  {score[1]}"
 
     # Emoji text
-    emoji = ImageFont.truetype(os.path.join(src_dir, "static", "font", "emoji.ttf"), 48)
-    r_emoji_position = (title1_position[0] + title1_length / 2, h / 2 - 165)
-    l_emoji_position = (title2_position[0] - title2_length / 2, h / 2 - 165)
-    r_emoji = "👑" if score[0] > score[1] else "💔"
-    l_emoji = "👑" if score[0] < score[1] else "💔"
+    emoji = ImageFont.truetype(os.path.join(src_dir, "static", "font", "emoji.ttf"), 60)
+    l_emoji_position = (w / 2 - 450, h / 2 - 165)
+    r_emoji_position = (w / 2 + 450, h / 2 - 165)
+    l_emoji = "👑" if score[0] > score[1] else "💔"
+    r_emoji = "👑" if score[0] < score[1] else "💔"
 
-    template.text(title1_position, team_names[0], font=mussels, fill=title1_colour, anchor="lm")
-    template.text(title2_position, team_names[1], font=mussels, fill=title2_colour, anchor="rm")
-    template.text(subtitle_position, players_str, font=helvetica, fill=score_colour, anchor="mm")
-    template.text(score_position, score_str, font=eras, fill=subtitle_colour, anchor="mm")
-    template.text(r_emoji_position, r_emoji, font=emoji, fill=title1_colour, anchor="lm")
-    template.text(l_emoji_position, l_emoji, font=emoji, fill=title2_colour, anchor="rm")
+    template.text(title1_position, team_names[0].upper(), font=mussels, fill=title1_colour, anchor="lm")
+    template.text(title2_position, team_names[1].upper(), font=mussels, fill=title2_colour, anchor="rm")
+    template.multiline_text(
+        subtitle_position, players_str, font=helvetica, fill=subtitle_colour, anchor="mm", align="center", spacing=10
+    )
+    template.text(score_position, score_str, font=eras, fill=score_colour, anchor="mm")
+    template.text(l_emoji_position, l_emoji, font=emoji, fill=title1_colour, anchor="lm")
+    template.text(r_emoji_position, r_emoji, font=emoji, fill=title2_colour, anchor="rm")
 
-    b = BytesIO()
-    img.save(b, format="jpeg")
-    return b
+    img.save(buffer, format="jpeg")
+    return buffer
 
 
 # Copyright (C) 2025 BBombs
