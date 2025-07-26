@@ -11,6 +11,7 @@ from src.models import (
     BattlefrontBotSlashContext,
 )
 from src.static.const import *
+from src.utils import bot_in_channel
 
 misc = BattlefrontBotPlugin("misc")
 
@@ -22,6 +23,10 @@ psutil.cpu_percent(interval=1)
 @lightbulb.command("info", description="Get performance statistics for the bot")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def bot_info(ctx: BattlefrontBotSlashContext) -> None:
+    if not await bot_in_channel(ctx):
+        await ctx.respond_with_failure("**The bot needs access to this channel for this command**", ephemeral=True)
+        return
+
     start = perf_counter_ns()
     await ctx.loading()
     end = perf_counter_ns()

@@ -1,5 +1,6 @@
 import os
 from collections import Counter
+from contextlib import suppress
 from itertools import islice
 from random import randint
 
@@ -18,90 +19,16 @@ from src.models import (
     SessionContext,
 )
 from src.static import *
-from src.utils import can_respond, is_admin
+from src.utils import bot_in_channel, is_admin
 
 battlefront = BattlefrontBotPlugin("battlefront")
-battlefront.add_checks(lightbulb.checks.guild_only, lightbulb.Check(can_respond, can_respond))
-
-
-# ToDo: Delete this
-class Fakemember:
-    """Fake member object used for testing."""
-
-    def __init__(self, id, display_name, role_ids, guild_id):
-        self.id = id
-        self.display_name = display_name
-        self.role_ids = role_ids
-        self.guild_id = guild_id
-
-
-def get_fake_members() -> list[Fakemember]:
-    """Will return a list of fake members for testing."""
-    return [
-        Fakemember(
-            1,
-            "bubbleBee30",
-            [
-                1384108414937993338,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            2,
-            "gangkid2",
-            [
-                1384108414937993338,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            3,
-            "Treehugs533",
-            [
-                1384108414937993338,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            4,
-            "Dolphinlover6",
-            [
-                1384108482516488343,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            5,
-            "bighay458",
-            [
-                1384108482516488343,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            6,
-            "massiveballer2013",
-            [
-                1384108535478095883,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            7,
-            "sigmamalemember2",
-            [
-                1384108535478095883,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(8, "robot3", [], 1042398810707591209),
-    ]
+battlefront.add_checks(lightbulb.checks.guild_only)
 
 
 @battlefront.command
-@lightbulb.option("greencaps", "The role for green caps", type=hikari.Role, required=True)
-@lightbulb.option("yellowcaps", "The role for yellow caps", type=hikari.Role, required=True)
-@lightbulb.option("redcaps", "The role for red caps", type=hikari.Role, required=True)
+@lightbulb.option("green", "The role for green (rank 1)", type=hikari.Role, required=True)
+@lightbulb.option("yellow", "The role for yellow (rank 2)", type=hikari.Role, required=True)
+@lightbulb.option("red", "The role for red (rank 3)", type=hikari.Role, required=True)
 @lightbulb.command("roles", description="Set the roles that determine player rank", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def set_roles(
@@ -110,8 +37,6 @@ async def set_roles(
     if not is_admin(ctx.member):
         await ctx.respond_with_failure("**Only administrators can set roles**", ephemeral=True)
         return
-
-    await ctx.loading()
 
     await ctx.app.db.execute(
         """
@@ -125,16 +50,19 @@ async def set_roles(
         ctx.guild_id,
     )
 
-    await ctx.respond_with_success("**Successfully updated rank roles**", edit=True)
+    await ctx.respond_with_success("**Successfully updated rank roles**")
 
 
 @battlefront.command
-@lightbulb.option("timeout", "How long the bot should wait for 8 players", type=int, required=False, max_value=999)
+@lightbulb.option(
+    "timeout", "How long the bot should wait for 8 players", default=30, type=int, required=False, max_value=999
+)
 @lightbulb.command("start", description="Starts a game session", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
-    if not timeout:
-        timeout = 30
+    if not await bot_in_channel(ctx):
+        await ctx.respond_with_failure("**The bot needs access to this channel for this command**", ephemeral=True)
+        return
 
     if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
         await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)
@@ -181,8 +109,7 @@ async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
 
     await message.edit(embed=embed, components=[])
 
-    session_context = SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member)
-    session = GameSession(session_context)
+    session = GameSession(SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member))
 
     embed.set_footer(f"Session: {ctx.app.game_session_manager.session_count + 1}")
     await message.edit(embed=embed)
@@ -254,11 +181,9 @@ async def caps_score(ctx: BattlefrontBotSlashContext, team1score: int, team2scor
 @lightbulb.command("career", description="Shows a players stats", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None:
-    await ctx.loading()
-
     db_member = await DatabaseMember.fetch(player.id, ctx.guild_id)
     if sum([db_member.wins, db_member.loses]) == 0:
-        await ctx.respond_with_failure("**This player has no stats**", edit=True)
+        await ctx.respond_with_failure("**This player has no stats**")
         return
 
     embed = hikari.Embed(
@@ -268,25 +193,24 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
         colour=DEFAULT_EMBED_COLOUR,
     )
     embed.set_thumbnail(player.avatar_url)
-    await ctx.edit_last_response("", embed=embed)
+    await ctx.respond(embed=embed)
 
 
 @battlefront.command
 @lightbulb.add_cooldown(30, 1, lightbulb.buckets.GuildBucket)
 @lightbulb.command("leaderboard", description="Shows the leaderboard for this server", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
-async def leaderboard(ctx: BattlefrontBotSlashContext, guildid: int | None = None) -> None:
-    await ctx.loading()
+async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
+    with suppress(hikari.ForbiddenError):
+        await ctx.app.rest.trigger_typing(ctx.channel_id)
 
-    guild_id = guildid if guildid else ctx.guild_id
-
-    records = await ctx.app.db.fetch("SELECT * FROM members WHERE guildId = $1", guild_id)
+    records = await ctx.app.db.fetch("SELECT * FROM members WHERE guildId = $1", ctx.guild_id)
 
     if not records:
-        await ctx.respond_with_failure("**This server has no stats**", edit=True)
+        await ctx.respond_with_failure("**This server has no stats**")
         return
 
-    guild_members = await ctx.app.rest.fetch_members(guild_id)  # Better off making one bulk call then many
+    guild_members = await ctx.app.rest.fetch_members(ctx.guild_id)  # Better off making one bulk call then many
 
     member_wins = {}
     member_wl = {}
@@ -297,10 +221,10 @@ async def leaderboard(ctx: BattlefrontBotSlashContext, guildid: int | None = Non
         for member in guild_members:
             if member.id == record["userid"]:
                 member_wins[member] = record["wins"]
-                member_wl[member] = round((record["wins"] / (record["loses"] + record["wins"] + record["ties"])), 3)
+                member_wl[member] = round((record["wins"] / sum([record["loses"], record["wins"], record["ties"]])), 3)
 
     if len(member_wins) == 0:
-        await ctx.respond_with_failure("**This server has no stats**", edit=True)
+        await ctx.respond_with_failure("**This server has no stats**")
         return
 
     member_wins = dict(sorted(member_wins.items(), key=lambda item: item[1], reverse=True))
@@ -324,7 +248,7 @@ async def leaderboard(ctx: BattlefrontBotSlashContext, guildid: int | None = Non
         value="\n".join(f"**{member.display_name}:** {member_wl[member]}" for member in member_wl),
         inline=True,
     )
-    await ctx.edit_last_response("", embed=embed)
+    await ctx.respond(embed=embed)
 
 
 @battlefront.command
@@ -334,7 +258,9 @@ async def leaderboard(ctx: BattlefrontBotSlashContext, guildid: int | None = Non
 @lightbulb.command("randmap", description="Picks a random map", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int = 1) -> None:
-    await ctx.loading()
+    if not await bot_in_channel(ctx):
+        await ctx.respond_with_failure("**The bot needs access to this channel for this command**", ephemeral=True)
+        return
 
     possible_maps = [map for map in MAPS if MAPS[map] >= index]
     maps = []
@@ -392,12 +318,12 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int = 1) 
 @lightbulb.command("map", description="Get a map", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def get_map(ctx: BattlefrontBotSlashContext, name: str) -> None:
-    await ctx.loading()
+    with suppress(hikari.ForbiddenError):
+        await ctx.app.rest.trigger_typing(ctx.channel_id)
 
     img_path = os.path.join(ctx.app.base_dir, "src", "static", "img", name.lower().replace(" ", "_") + ".jpg")
-    embed = hikari.Embed(title=name, colour=DEFAULT_EMBED_COLOUR).set_image(img_path)
 
-    await ctx.edit_last_response("", embed=embed)
+    await ctx.respond(embed=hikari.Embed(title=name, colour=DEFAULT_EMBED_COLOUR).set_image(img_path))
 
     if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
         session.set_map(img_path)
@@ -425,6 +351,10 @@ async def forcestart(
     player7: hikari.Member,
     player8: hikari.Member,
 ) -> None:
+    if not await bot_in_channel(ctx):
+        await ctx.respond_with_failure("**The bot needs access to this channel for this command**", ephemeral=True)
+        return
+
     if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
         await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)
         return
@@ -441,8 +371,7 @@ async def forcestart(
         await ctx.respond_with_failure("**Duplicate users were given** each player must be unique", ephemeral=True)
         return
 
-    game_context = SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member)
-    session = GameSession(game_context)
+    session = GameSession(SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member))
 
     await ctx.respond_with_success("**Started a match with forced teams**", ephemeral=True)
     await ctx.app.game_session_manager.start_session(ctx.guild_id, session, players, force=True)
@@ -452,10 +381,8 @@ async def forcestart(
 @lightbulb.command("flushcache", description="Clear the player cache for this server")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def flushcache(ctx: BattlefrontBotSlashContext) -> None:
-    await ctx.loading()
-
     ctx.app.game_session_manager.player_cache.clear_guild(ctx.guild_id)
-    await ctx.respond_with_success("**Flushed guild player cache**", edit=True)
+    await ctx.respond_with_success("**Flushed guild player cache**", ephemeral=True)
 
 
 @battlefront.command

@@ -10,8 +10,10 @@ if t.TYPE_CHECKING:
     from src.models.context import BattlefrontBotSlashContext
 
 
-async def can_respond(ctx: BattlefrontBotSlashContext) -> bool:
-    """Will return true if the bot can send messages in the event channel.
+async def bot_in_channel(ctx: BattlefrontBotSlashContext) -> bool:
+    """Will return true if the bot has access to the context channel.
+
+    Because the bot can make responses to application commands in channels it is not in.
 
     Parameters
     ----------
