@@ -4,14 +4,15 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Improvements for match banner">
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Improvements to game sessions">
+      <change afterPath="$PROJECT_DIR$/src/models/database_match.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/extensions/misc.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/misc.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/bot.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/views.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/views.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/img/scarifff_beach.jpg" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/img/scarif_beach.jpg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/helpers.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/helpers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/models/game_session_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session_manager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/sql/schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/src/sql/schema.sql" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/utils/image_manipulation.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/image_manipulation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -286,7 +287,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753363942229</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="Improvements to game sessions">
+      <option name="closed" value="true" />
+      <created>1753543050693</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1753543050693</updated>
+    </task>
+    <option name="localTasksCounter" value="24" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -325,6 +334,7 @@
     <MESSAGE value="Added database backup functionality via app" />
     <MESSAGE value="Game sumamry with pillow and improvements." />
     <MESSAGE value="Improvements for match banner" />
-    <option name="LAST_COMMIT_MESSAGE" value="Improvements for match banner" />
+    <MESSAGE value="Improvements to game sessions" />
+    <option name="LAST_COMMIT_MESSAGE" value="Improvements to game sessions" />
   </component>
 </project>

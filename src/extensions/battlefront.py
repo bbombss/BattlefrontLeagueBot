@@ -1,6 +1,9 @@
+import asyncio
+import datetime
 import os
 from collections import Counter
 from contextlib import suppress
+from io import BytesIO
 from itertools import islice
 from random import randint
 
@@ -18,8 +21,9 @@ from src.models import (
     MapVotingView,
     SessionContext,
 )
+from src.models.database_match import DatabaseMatch
 from src.static import *
-from src.utils import bot_in_channel, is_admin
+from src.utils import bot_in_channel, generate_game_banner, is_admin
 
 battlefront = BattlefrontBotPlugin("battlefront")
 battlefront.add_checks(lightbulb.checks.guild_only)
@@ -31,9 +35,7 @@ battlefront.add_checks(lightbulb.checks.guild_only)
 @lightbulb.option("red", "The role for red (rank 3)", type=hikari.Role, required=True)
 @lightbulb.command("roles", description="Set the roles that determine player rank", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
-async def set_roles(
-    ctx: BattlefrontBotSlashContext, greencaps: hikari.Role, yellowcaps: hikari.Role, redcaps: hikari.Role
-) -> None:
+async def set_roles(ctx: BattlefrontBotSlashContext, green: hikari.Role, yellow: hikari.Role, red: hikari.Role) -> None:
     if not is_admin(ctx.member):
         await ctx.respond_with_failure("**Only administrators can set roles**", ephemeral=True)
         return
@@ -44,9 +46,9 @@ async def set_roles(
         SET rank1Role = $1, rank2Role = $2, rank3Role = $3
         WHERE guildId = $4
         """,
-        greencaps.id,
-        yellowcaps.id,
-        redcaps.id,
+        green.id,
+        yellow.id,
+        red.id,
         ctx.guild_id,
     )
 
@@ -87,20 +89,18 @@ async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     resp = await ctx.respond(embed=embed, components=view)
 
     message = await resp.message()
+    ctx.app.game_session_manager.last_registration_message[ctx.guild_id] = message.id
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
 
     if len(view.registered_members) < 8:
-        await message.edit(
-            embed=hikari.Embed(description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR),
-            components=[],
-        )
-        return
-    elif len(view.registered_members) > 8:
-        await message.edit(
-            embed=hikari.Embed(description=f"{FAIL_EMOJI} **Too many players registered**", colour=FAIL_EMBED_COLOUR),
-            components=[],
-        )
+        with suppress(hikari.NotFoundError):
+            await message.edit(
+                embed=hikari.Embed(
+                    description=f"{FAIL_EMOJI} **Not enough players registered**", colour=FAIL_EMBED_COLOUR
+                ),
+                components=[],
+            )
         return
 
     embed = hikari.Embed(description=f"{SUCCESS_EMOJI} **Registration Complete**", colour=DEFAULT_EMBED_COLOUR)
@@ -117,28 +117,21 @@ async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     await ctx.app.game_session_manager.start_session(ctx.guild_id, session, view.registered_members)
 
 
-# ToDo: Unbeta this
 @battlefront.command
 @lightbulb.option("player", "The player to remove", type=hikari.Member, required=True)
-@lightbulb.option(
-    "messageid", "Id of the message the start component is on", type=str, required=True, min_length=18, max_length=19
-)
-@lightbulb.command("unregister", description="(BETA) Force remove a player from registration", pass_options=True)
+@lightbulb.command("unregister", description="Force remove a player from registration", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
-async def remove_player(ctx: BattlefrontBotSlashContext, messageid: str, player: hikari.Member) -> None:
+async def remove_player(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None:
     if not is_admin(ctx.member):
         await ctx.respond_with_failure("**Only a server administrator can do this**", ephemeral=True)
         return
 
-    try:
-        id = int(messageid)
-    except ValueError:
-        await ctx.respond_with_failure("**Invalid message id provided**", ephemeral=True)
-        return
+    view: miru.View | None = None
+    if message_id := ctx.app.game_session_manager.last_registration_message[ctx.guild_id]:
+        view = ctx.app.miru_client.get_bound_view(message_id)
 
-    view: CapsRegisterView = ctx.app.miru_client.get_bound_view(id)
     if view is None or not isinstance(view, CapsRegisterView):
-        await ctx.respond_with_failure("**No registration component found at provided message**", ephemeral=True)
+        await ctx.respond_with_failure("**No registration component found for this server**", ephemeral=True)
         return
 
     if not any(player.id == m.id for m in view.registered_members):
@@ -189,7 +182,8 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
     embed = hikari.Embed(
         title=player.display_name,
         description=f"**Wins:** {db_member.wins}\n**Loses:** {db_member.loses}\n"
-        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins + db_member.ties)), 3)}",
+        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins + db_member.ties)), 3)}\n"
+        f"**MMR (Estimated):** {db_member.rank if db_member.rank != 0 else 'Not calibrated'}",
         colour=DEFAULT_EMBED_COLOUR,
     )
     embed.set_thumbnail(player.avatar_url)
@@ -293,7 +287,8 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int = 1) 
     await view.wait()
 
     if len(view.votes) < 1:
-        await ctx.respond_with_failure("No one voted", edit=True)
+        with suppress(hikari.NotFoundError):
+            await ctx.respond_with_failure("No one voted", edit=True)
         return
 
     vote_counts = Counter(view.votes.values())
@@ -327,6 +322,55 @@ async def get_map(ctx: BattlefrontBotSlashContext, name: str) -> None:
 
     if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
         session.set_map(img_path)
+
+
+@battlefront.command
+@lightbulb.option("id", "The id for the match", type=int, required=True)
+@lightbulb.command("match", description="Shows a summary for the given match", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def matchsummary(ctx: BattlefrontBotSlashContext, id: int) -> None:
+    match = await DatabaseMatch.fetch(id)
+    if not match.guild_id or match.guild_id != ctx.guild_id:
+        await ctx.respond_with_failure("**No such match exists**", ephemeral=True)
+        return
+
+    with suppress(hikari.ForbiddenError):
+        await ctx.app.rest.trigger_typing(ctx.channel_id)
+
+    winner_score = int(match.winner_data["round1Score"]) + int(match.winner_data["round2Score"])
+    loser_score = int(match.loser_data["round1Score"]) + int(match.loser_data["round2Score"])
+    winner_names = []
+    loser_names = []
+
+    guild_members = await ctx.app.rest.fetch_members(ctx.guild_id)
+    for member in guild_members:
+        if member.id in match.winner_data["playerIds"]:
+            winner_names.append(member.display_name)
+        if member.id in match.loser_data["playerIds"]:
+            loser_names.append(member.display_name)
+
+    b: BytesIO = await asyncio.get_running_loop().run_in_executor(
+        None,
+        generate_game_banner,
+        [match.winner_data["name"], match.loser_data["name"]],
+        (winner_score, loser_score),
+        winner_names,
+    )
+
+    description = f"{match.winner_data['name']} won" if not match.tied else "Teams tied"
+
+    embed = hikari.Embed(
+        title=f"{match.winner_data['name']} vs {match.loser_data['name']}",
+        description=f"**{description} {winner_score} - {loser_score}{f' on {match.map}' if match.map else ''}**",
+        colour=DEFAULT_EMBED_COLOUR,
+        timestamp=match.date.astimezone(datetime.timezone.utc),
+    )
+    embed.add_field(name=match.winner_data["name"], value=", ".join(winner_names))
+    embed.add_field(name=match.loser_data["name"], value=", ".join(loser_names))
+    embed.set_footer(str(match.id))
+    embed.set_image(hikari.Bytes(b.getvalue(), "banner.jpg"))
+
+    await ctx.respond(embed=embed)
 
 
 @battlefront.command
@@ -381,6 +425,10 @@ async def forcestart(
 @lightbulb.command("flushcache", description="Clear the player cache for this server")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def flushcache(ctx: BattlefrontBotSlashContext) -> None:
+    if not is_admin(ctx.member):
+        await ctx.respond_with_failure("**You cannot do this**", ephemeral=True)
+        return
+
     ctx.app.game_session_manager.player_cache.clear_guild(ctx.guild_id)
     await ctx.respond_with_success("**Flushed guild player cache**", ephemeral=True)
 

@@ -69,6 +69,10 @@ def generate_game_banner(team_names: list[str], score: tuple[int, int], winning_
     l_emoji = "👑" if score[0] > score[1] else "💔"
     r_emoji = "👑" if score[0] < score[1] else "💔"
 
+    if score[0] == score[1]:
+        l_emoji = "🟰"
+        r_emoji = "🟰"
+
     template.text(title1_position, team_names[0].upper(), font=mussels, fill=title1_colour, anchor="lm")
     template.text(title2_position, team_names[1].upper(), font=mussels, fill=title2_colour, anchor="rm")
     template.multiline_text(

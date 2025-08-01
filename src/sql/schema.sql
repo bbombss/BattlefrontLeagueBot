@@ -41,6 +41,20 @@ CREATE TABLE IF NOT EXISTS maps
     PRIMARY KEY (mapId)
 );
 
+CREATE TABLE IF NOT EXISTS matches
+(
+    matchId bigint NOT NULL,
+    guildId bigint NOT NULL,
+    winnerData json NOT NULL,
+    loserData json NOT NULL,
+    matchTied bool NOT NULL DEFAULT false,
+    matchDate timestamp,
+    mapName text,
+    PRIMARY KEY (matchId),
+    FOREIGN KEY (guildId) REFERENCES guilds (guildId)
+        ON DELETE CASCADE
+);
+
 -- Copyright (C) 2025 BBombs
 
 -- This program is free software: you can redistribute it and/or modify

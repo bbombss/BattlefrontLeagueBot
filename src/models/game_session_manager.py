@@ -62,7 +62,8 @@ class GameSessionManager:
         self._app = app
         self._sessions: dict[hikari.Snowflake, GameSession] = {}
         self._player_cache = PlayerCache()
-        self._session_count = 0
+        self._last_registration_message = {}
+        self._session_count: int | None = None
 
     @property
     def app(self) -> BattleFrontBot:
@@ -77,7 +78,20 @@ class GameSessionManager:
     @property
     def session_count(self) -> int:
         """The number of unique sessions that have been active."""
+        if self._session_count is None:
+            raise AttributeError("Cannot get session count until bot has started")
+
         return self._session_count
+
+    @property
+    def last_registration_message(self) -> dict[hikari.Snowflake, hikari.Snowflake]:
+        """A dictionary of guild ids and the id of their most recent registration message."""
+        return self._last_registration_message
+
+    async def set_session_count(self) -> None:
+        """Set the number of sessions ever created as fetched from the database."""
+        session_count = await self.app.db.fetch("SELECT MAX(matchId) FROM matches")
+        self._session_count = int(session_count[0]["max"])
 
     async def start_session(
         self, guild_id: hikari.Snowflake, session: GameSession, members: list[hikari.Member], force: bool = False

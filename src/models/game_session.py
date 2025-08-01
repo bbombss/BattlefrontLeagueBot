@@ -3,7 +3,9 @@ from __future__ import annotations
 __all__ = ["GameSession", "SessionContext"]
 
 import asyncio
+import datetime
 import itertools
+import json
 import math
 import typing as t
 from collections import Counter
@@ -11,6 +13,8 @@ from io import BytesIO
 from random import randint
 
 import hikari
+
+from src.models.database_match import DatabaseMatch
 
 if t.TYPE_CHECKING:
     from src.models.bot import BattleFrontBot
@@ -57,6 +61,7 @@ class GamePlayer:
         self.member = member
         self.name = name
         self.role = role
+        self.rank: int | None = None
 
 
 class GameTeam:
@@ -96,11 +101,14 @@ class GameMatch:
         """
         self.team1 = team1
         self.team2 = team2
+
         self.round1_winner: GameTeam | None = None
         self.round2_winner: GameTeam | None = None
         self.round1_scores: tuple[int] | None = None
         self.round2_scores: tuple[int] | None = None
+
         self.winner: GameTeam | None = None
+        self.loser: GameTeam | None = None
         self.final_scores: tuple[int] | None = None
 
 
@@ -152,7 +160,6 @@ def format_team_voting_embed(matches_group: list[GameMatch]) -> tuple[hikari.Emb
     return embed, fields
 
 
-# ToDo: Handle session message deletion
 class SessionContext:
     """Context object for GameSessions."""
 
@@ -688,20 +695,48 @@ class GameSession:
         if not self._match.winner:
             raise GameSessionError("Cannot save a match that isn't complete")
 
-        if self._match.final_scores[0] != self._match.final_scores[1]:
-            loser = self._match.team2 if self._match.winner is self._match.team1 else self._match.team1
-            winner_ids = [player.member.id for player in self._match.winner.players]
-            loser_ids = [player.member.id for player in loser.players]
+        match = self._match
+
+        if match.final_scores[0] != match.final_scores[1]:
+            winner_ids = [player.member.id for player in match.winner.players]
+            loser_ids = [player.member.id for player in match.loser.players]
             guild_ids = [self.ctx.guild.id] * 4
 
             await self.ctx.app.db.execute(query.format(*["1", "0", "0", "wins"]), winner_ids, guild_ids)
             await self.ctx.app.db.execute(query.format(*["0", "1", "0", "loses"]), loser_ids, guild_ids)
 
         else:
-            player_ids = [player.member.id for player in [*self._match.team1.players, *self._match.team2.players]]
+            player_ids = [player.member.id for player in [*match.team1.players, *match.team2.players]]
             guild_ids = [self.ctx.guild.id] * 8
 
             await self.ctx.app.db.execute(query.format(*["0", "0", "1", "ties"]), player_ids, guild_ids)
+
+        db_match = DatabaseMatch(
+            self.id,
+            self.ctx.guild.id,
+            date=datetime.datetime.now(),
+            map=self._map,
+            tied=match.final_scores[0] == match.final_scores[1],
+        )
+
+        winner_index = 0 if match.final_scores[0] > match.final_scores[1] else 1
+        loser_index = 1 - winner_index
+
+        winner_data = {
+            "name": match.winner.name,
+            "playerIds": [player.member.id for player in match.winner.players],
+            "round1Score": match.round1_scores[winner_index],
+            "round2Score": match.round2_scores[winner_index],
+        }
+        loser_data = {
+            "name": match.loser.name,
+            "playerIds": [player.member.id for player in match.loser.players],
+            "round1Score": match.round1_scores[loser_index],
+            "round2Score": match.round2_scores[loser_index],
+        }
+        db_match.winner_data = json.dumps(winner_data)
+        db_match.loser_data = json.dumps(loser_data)
+        await db_match.update()
 
     async def _wait_for_scores(self) -> None:
         """Start the game loop waiting for scores.
@@ -723,7 +758,12 @@ class GameSession:
 
             if round_no == 3:
                 self._match.winner = self._match.team1 if total_scores[0] > total_scores[1] else self._match.team2
+                self._match.loser = self._match.team1 if total_scores[0] < total_scores[1] else self._match.team2
                 self._match.final_scores = (total_scores[0], total_scores[1])
+
+                if total_scores[0] == total_scores[1]:
+                    self._match.winner = self._match.team1
+                    self._match.loser = self._match.team2
 
             return self._match
 
@@ -733,7 +773,7 @@ class GameSession:
         while self.session_task and round_no < 3:
             try:
                 self.event.clear()
-                await asyncio.wait_for(self.event.wait(), timeout=3000)
+                await asyncio.wait_for(self.event.wait(), timeout=3600)
             except asyncio.TimeoutError:
                 timeout = True
                 break
@@ -750,8 +790,8 @@ class GameSession:
             await self.ctx.edit_last_response(embed=embed, components=[])
             return
 
-        await self.ctx.send_match_summary(self._match)
         await self._save_match()
+        await self.ctx.send_match_summary(self._match)
 
     def add_score(self, score1: int, score2: int) -> None:
         """Add a score to this session.
@@ -819,7 +859,7 @@ class GameSession:
             await self.ctx.loading()
 
         self._session_task = asyncio.create_task(self._wait_for_scores())
-        await asyncio.wait_for(self._session_task, timeout=3005)
+        await asyncio.wait_for(self._session_task, timeout=3610)
 
         self._session_manager.remove_session(self.ctx.guild.id)
 
