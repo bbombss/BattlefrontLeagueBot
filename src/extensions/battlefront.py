@@ -246,14 +246,33 @@ async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
 
 
 def map_image_path_for(map: str) -> str:
+    """Get the path to the image for this map."""
     return os.path.join(battlefront.app.base_dir, "src", "static", "img", map.lower().replace(" ", "_") + ".jpg")
 
 
 def get_map_choices() -> list[str]:
+    """Get the list of maps excluding banned maps."""
     return [map for map in MAPS if MAPS[map] != 0]
 
 
 def get_random_maps(index: int, amount: int, guild_id: hikari.Snowflake) -> list[str]:
+    """Get a list of random maps.
+
+    Parameters
+    ----------
+    index : int
+        The minimum index that the maps can have.
+    amount : int
+        The amount of random maps to get.
+    guild_id : hikari.Snowflake
+        The ID of the guild these maps are being generated for.
+
+    Returns
+    -------
+    list[str]
+        A list of map names.
+
+    """
     possible_maps = [map for map in MAPS if MAPS[map] >= index]
     maps = []
 
