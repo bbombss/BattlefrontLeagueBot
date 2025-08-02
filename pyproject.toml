@@ -30,7 +30,7 @@ quote-style = "double"
 
 [project]
 name = "battlefront2bot"
-version = "1.0.0"
+version = "1.1.1a"
 license = "GNU GPL-3.0"
 package-mode = false
 requires-python = ">=3.11,<3.13"
