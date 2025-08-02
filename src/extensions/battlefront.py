@@ -245,26 +245,65 @@ async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
     await ctx.respond(embed=embed)
 
 
-@battlefront.command
-@lightbulb.add_cooldown(60, 3, lightbulb.buckets.GuildBucket)
-@lightbulb.option("amount", "Amount of maps to generate", type=int, required=False, min_value=1, max_value=3)
-@lightbulb.option("index", "Map index", type=int, required=True, min_value=1, max_value=3)
-@lightbulb.command("randmap", description="Picks a random map", pass_options=True)
-@lightbulb.implements(lightbulb.SlashCommand)
-async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int = 1) -> None:
-    if not await bot_in_channel(ctx):
-        await ctx.respond_with_failure("**The bot needs access to this channel for this command**", ephemeral=True)
-        return
+def map_image_path_for(map: str) -> str:
+    return os.path.join(battlefront.app.base_dir, "src", "static", "img", map.lower().replace(" ", "_") + ".jpg")
 
+
+def get_map_choices() -> list[str]:
+    return [map for map in MAPS if MAPS[map] != 0]
+
+
+def get_random_maps(index: int, amount: int, guild_id: hikari.Snowflake) -> list[str]:
     possible_maps = [map for map in MAPS if MAPS[map] >= index]
     maps = []
-    urls = []
 
     for i in range(0, amount):
         rand_map = possible_maps[randint(0, len(possible_maps) - 1)]
         possible_maps.remove(rand_map)
         maps.append(rand_map)
-        urls.append(os.path.join(ctx.app.base_dir, "src", "static", "img", rand_map.lower().replace(" ", "_") + ".jpg"))
+
+    if len(maps) > 1 and battlefront.app.game_session_manager.last_map.get(guild_id):
+        last_map = battlefront.app.game_session_manager.last_map[guild_id]
+        maps.pop(-1)
+        maps.append(last_map)
+        battlefront.app.game_session_manager.last_map.pop(guild_id)
+
+    return maps
+
+
+@battlefront.command
+@lightbulb.add_cooldown(60, 2, lightbulb.buckets.GuildBucket)
+@lightbulb.option("index", "Map index, default is 1", type=int, required=False, min_value=1, max_value=3)
+@lightbulb.option("amount", "Amount of random maps to generate", type=int, required=False, min_value=1, max_value=3)
+@lightbulb.option("map3", "Custom map slot 3", type=str, required=False, choices=get_map_choices())
+@lightbulb.option("map2", "Custom map slot 2", type=str, required=False, choices=get_map_choices())
+@lightbulb.option("map1", "Custom map slot 1", type=str, required=False, choices=get_map_choices())
+@lightbulb.command(
+    "mapvote", description="Picks random maps or uses provided for players to vote on", pass_options=True
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def mapvote(
+    ctx: BattlefrontBotSlashContext, index: int, amount: int, map1: str | None, map2: str | None, map3: str | None
+) -> None:
+    if not await bot_in_channel(ctx):
+        await ctx.respond_with_failure("**The bot needs access to this channel for this command**", ephemeral=True)
+        return
+
+    if amount:
+        maps = get_random_maps(index if index else 1, amount, ctx.guild_id)
+    elif map1 and map2:
+        maps = [map1, map2]
+        if map3:
+            maps.append(map3)
+    else:
+        await ctx.respond_with_failure(
+            "**You did not specify an amount of random maps or enough custom maps**", ephemeral=True
+        )
+        return
+
+    await ctx.loading()
+
+    urls = [map_image_path_for(map) for map in maps]
 
     if len(maps) == 1:
         embed = hikari.Embed(title=maps[0], colour=DEFAULT_EMBED_COLOUR).set_image(urls[0])
@@ -294,17 +333,16 @@ async def randmap(ctx: BattlefrontBotSlashContext, index: int, amount: int = 1) 
     vote_counts = Counter(view.votes.values())
     winner_vote, winner_count = vote_counts.most_common(1)[0]
 
-    url = os.path.join(ctx.app.base_dir, "src", "static", "img", winner_vote.lower().replace(" ", "_") + ".jpg")
     await ctx.edit_last_response(
         "",
         embed=hikari.Embed(
             title=f"{winner_vote} won with {winner_count}/{len(view.votes)} votes", colour=DEFAULT_EMBED_COLOUR
-        ).set_image(url),
+        ).set_image(map_image_path_for(winner_vote)),
         components=[],
     )
 
     if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
-        session.set_map(url)
+        session.set_map(map_image_path_for(winner_vote))
 
 
 @battlefront.command
@@ -320,6 +358,7 @@ async def get_map(ctx: BattlefrontBotSlashContext, name: str) -> None:
 
     await ctx.respond(embed=hikari.Embed(title=name, colour=DEFAULT_EMBED_COLOUR).set_image(img_path))
 
+    ctx.app.game_session_manager.last_map[ctx.guild_id] = name
     if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
         session.set_map(img_path)
 

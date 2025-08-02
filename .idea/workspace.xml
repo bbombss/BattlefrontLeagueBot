@@ -4,15 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Improvements to game sessions">
-      <change afterPath="$PROJECT_DIR$/src/models/database_match.py" afterDir="false" />
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Match persistence, better error handling">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/bot.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/bot.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/game_session_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session_manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/sql/schema.sql" beforeDir="false" afterPath="$PROJECT_DIR$/src/sql/schema.sql" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/utils/image_manipulation.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/utils/image_manipulation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -295,7 +291,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753543050693</updated>
     </task>
-    <option name="localTasksCounter" value="24" />
+    <task id="LOCAL-00024" summary="Match persistence, better error handling">
+      <option name="closed" value="true" />
+      <created>1754053757797</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1754053757797</updated>
+    </task>
+    <option name="localTasksCounter" value="25" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -335,6 +339,7 @@
     <MESSAGE value="Game sumamry with pillow and improvements." />
     <MESSAGE value="Improvements for match banner" />
     <MESSAGE value="Improvements to game sessions" />
-    <option name="LAST_COMMIT_MESSAGE" value="Improvements to game sessions" />
+    <MESSAGE value="Match persistence, better error handling" />
+    <option name="LAST_COMMIT_MESSAGE" value="Match persistence, better error handling" />
   </component>
 </project>
