@@ -98,7 +98,9 @@ class GameSessionManager:
     async def set_session_count(self) -> None:
         """Set the number of sessions ever created as fetched from the database."""
         session_count = await self.app.db.fetch("SELECT MAX(matchId) FROM matches")
-        self._session_count = int(session_count[0]["max"])
+        if session_count[0]["max"]:
+            self._session_count = int(session_count[0]["max"])
+        self._session_count = 0
 
     async def start_session(
         self, guild_id: hikari.Snowflake, session: GameSession, members: list[hikari.Member], force: bool = False

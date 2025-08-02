@@ -12,15 +12,31 @@ from src.models.database import DatabaseModel
 
 @attr.define
 class DatabaseMatch(DatabaseModel):
+    """Dataclass for stored matches in the database."""
+
     id: int
+    """The ID for this match."""
+
     guild_id: hikari.Snowflake | None
+    """The id of the guild this match was created in."""
+
     date: datetime.datetime | None = None
+    """The date at which this match was completed."""
+
     map: str | None = None
+    """The map that is associated with this match."""
+
     winner_data: dict[str, t.Any] = attr.field(factory=dict)
+    """Data for the winner of this match, must be json serializable."""
+
     loser_data: dict[str, t.Any] = attr.field(factory=dict)
+    """Data for the loser of this match, must be json serializable."""
+
     tied: bool = False
+    """Whether or not this match resulted in a tie."""
 
     async def update(self) -> None:
+        """Update this match or add it if not already stored."""
         await self._db.execute(
             """
             INSERT INTO matches (matchId, guildId, winnerData, loserData, matchTied, matchDate, mapName)
@@ -39,6 +55,19 @@ class DatabaseMatch(DatabaseModel):
 
     @classmethod
     async def fetch(cls, match_id: int) -> t.Self:
+        """Fetch this match from the database.
+
+        Parameters
+        ----------
+        match_id : int
+            User ID for the match to be fetched.
+
+        Returns
+        -------
+        DatabaseMatch
+            Dataclass for stored match in the database or a default match if no such match exists.
+
+        """
         record = await cls._db.fetchrow("SELECT * FROM matches WHERE matchId = $1", match_id)
 
         if not record:
