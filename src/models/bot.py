@@ -176,8 +176,10 @@ class BattleFrontBot(lightbulb.BotApp):
         if user:
             self._user_id = user.id
 
+        await self.game_session_manager.set_session_count()
+
         toml_path = os.path.join(self.base_dir, "pyproject.toml")
-        version: str = "2.0.0"
+        version: str = "1.0.0"
 
         async with aiofiles.open(toml_path, "rb") as file:
             toml_data = await file.read()

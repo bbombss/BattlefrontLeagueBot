@@ -86,9 +86,10 @@ class DatabaseMember(DatabaseModel):
     async def remove(self) -> None:
         await self._db.execute(
             """
-            DELETE FROM members WHERE userId = $1
+            DELETE FROM members WHERE userId = $1 AND guildId = $2
             """,
             self.id,
+            self.guild_id,
         )
 
 

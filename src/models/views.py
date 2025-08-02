@@ -464,13 +464,6 @@ class CapsRegisterView(miru.View):
         self.author = author
         self.registered_members: list[hikari.Member] = []
 
-    async def on_timeout(self) -> None:
-        if self.message:
-            for item in self.children:
-                item.disabled = True
-            await self.message.edit(components=self)
-        self.stop()
-
     async def update_embed(self) -> None:
         self.embed.add_field(name="Players", value="\n".join([user.display_name for user in self.registered_members]))
         await self.message.edit(embed=self.embed)

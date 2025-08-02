@@ -30,7 +30,7 @@ quote-style = "double"
 
 [project]
 name = "battlefront2bot"
-version = "1.0.0"
+version = "1.1.1a"
 license = "GNU GPL-3.0"
 package-mode = false
 requires-python = ">=3.11,<3.13"
@@ -42,6 +42,7 @@ dependencies = [
     "aiofiles (>=24.1.0,<25.0.0)",
     "uvloop (==0.19.0)",
     "hikari-miru (~=4.2.0)",
+    "Pillow (~=11.3.0)"
 ]
 optional-dependencies = { ruff = [ "ruff~=0.9.3" ] }
 

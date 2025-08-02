@@ -155,12 +155,16 @@ async def application_command_error_handler(event: lightbulb.CommandErrorEvent) 
 
     embed = hikari.Embed(
         title=f"{FAIL_EMOJI} Unknown Error",
-        description=f"""An unhandled exception has occurred in the BBombsBot application.
-        This has been automatically logged, contact the bot administrator or raise an issue on [GitHub]({GITHUB_LINK}) if this issue persists.""",
+        description=f"""An unhandled exception has occurred in the BattlefrontBot application.
+        This has been automatically logged, contact the bot administrator or raise an issue on [GitHub]({GITHUB_LINK}) 
+        if this issue persists.""",
         colour=FAIL_EMBED_COLOUR,
         timestamp=datetime.datetime.now(tz=datetime.timezone.utc),
     )
-    embed.add_field(name="Error", value=f"```{error.__class__.__name__}: {error}```")
+    embed.add_field(
+        name="Error",
+        value=f"```{error.__class__.__name__}: {str(error).replace(errorhandler.app.config.TOKEN, 'TOKEN')}```",
+    )
     embed.set_footer(str(ctx.guild_id))
 
     try:

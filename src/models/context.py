@@ -24,7 +24,7 @@ class BattlefrontBotContext(lightbulb.Context, ABC):
         """Returns the current application."""
         return super().app  # type: ignore
 
-    async def wait(self) -> lightbulb.ResponseProxy:
+    async def loading(self) -> lightbulb.ResponseProxy:
         """Create a response with loading a message."""
         return await self.respond(f"{LOADING_EMOJI} Waiting for server...")
 
