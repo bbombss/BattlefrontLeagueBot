@@ -4,6 +4,7 @@ import datetime
 import typing as t
 
 import hikari
+from openskill.models import PlackettLuce
 
 from src.models.game_session import GamePlayer, GameSession
 
@@ -66,6 +67,7 @@ class GameSessionManager:
         self._last_registration_message = {}
         self._last_map = {}
         self._session_count: int | None = None
+        self._openskill_model = PlackettLuce(balance=True)
 
     @property
     def app(self) -> BattleFrontBot:
@@ -95,11 +97,17 @@ class GameSessionManager:
         """A dictionary of guild ids and their most recently requested map."""
         return self._last_map
 
+    @property
+    def openskill_model(self) -> PlackettLuce:
+        """The openskill model used to rate players."""
+        return self._openskill_model
+
     async def set_session_count(self) -> None:
         """Set the number of sessions ever created as fetched from the database."""
         session_count = await self.app.db.fetch("SELECT MAX(matchId) FROM matches")
         if session_count[0]["max"]:
             self._session_count = int(session_count[0]["max"])
+            return
         self._session_count = 0
 
     async def start_session(

@@ -5,7 +5,6 @@ __all__ = ["GameSession", "SessionContext"]
 import asyncio
 import datetime
 import itertools
-import json
 import math
 import typing as t
 from collections import Counter
@@ -15,6 +14,7 @@ from random import randint
 import hikari
 
 from src.models.database_match import DatabaseMatch
+from src.models.database_member import DatabaseMember
 
 if t.TYPE_CHECKING:
     from src.models.bot import BattleFrontBot
@@ -45,7 +45,7 @@ def ellipsize(s: str, width: int) -> str:
 class GamePlayer:
     """Player object for GameSessions."""
 
-    def __init__(self, member: hikari.Member, name: str, role: int) -> None:
+    def __init__(self, member: hikari.Member, name: str, role: int, rank: int, mu: float, sigma: float) -> None:
         """Player object for GameSessions.
 
         Parameters
@@ -56,12 +56,20 @@ class GamePlayer:
             The name of this player.
         role : int
             The role rank this player has.
+        rank : int
+            The mmr this player has.
+        mu : float
+            The openscore mu for this player.
+        sigma : float
+            The operscore sigma for this player.
 
         """
         self.member = member
         self.name = name
         self.role = role
-        self.rank: int | None = None
+        self.rank = rank
+        self.mu = mu if mu is not None else 25.0
+        self.sigma = sigma if sigma is not None else self.mu / 3
 
 
 class GameTeam:
@@ -550,7 +558,7 @@ class GameSession:
         rank_role: int | None = None
 
         for role in member.role_ids:
-            for i in range(1, 3):
+            for i in range(1, 4):
                 if role == self.rank_roles[i]:
                     rank_role = i
                     break
@@ -559,7 +567,9 @@ class GameSession:
             rank_role = 1
             await self.ctx.warn(f"Assigned rank 1 to {member.display_name} because they do not have a rank role")
 
-        game_player = GamePlayer(member, member.display_name, rank_role)
+        db_member = await DatabaseMember.fetch(member.id, member.guild_id)
+
+        game_player = GamePlayer(member, member.display_name, rank_role, db_member.rank, db_member.mu, db_member.sigma)
         self.ctx.app.game_session_manager.player_cache.set(member.id, game_player)
         return game_player
 
@@ -679,37 +689,86 @@ class GameSession:
             winner_index = group_start + (vote - 1)
             return matches[winner_index]
 
+    async def _handle_ranking(self) -> None:
+        """Rate the session match with openskill and persist the adjustments.
+
+        This method also logs the adjustments to each member.
+        """
+        if not self._match.winner:
+            raise GameSessionError("Session match must be over to model it in openskill")
+
+        model = self._session_manager.openskill_model
+        tied = self._match.final_scores[0] == self._match.final_scores[1]
+
+        winners, losers = [], []
+        for member in self._match.winner.players:
+            winners.append(model.rating(member.mu, member.sigma, str(member.member.id)))
+        for member in self._match.loser.players:
+            losers.append(model.rating(member.mu, member.sigma, str(member.member.id)))
+
+        winners, losers = model.rate([winners, losers], ranks=[0, 0] if tied else None)
+
+        async with self.ctx.app.db.pool.acquire() as con:
+            for i in range(0, len(winners)):
+                await con.execute(
+                    """UPDATE members SET mu = $1, sigma = $2 WHERE userId = $3 AND guildId = $4""",
+                    winners[i].mu,
+                    winners[i].sigma,
+                    int(winners[i].name),
+                    self.ctx.guild.id,
+                )
+                await con.execute(
+                    """
+                    INSERT INTO memberAuditLog (userId, guildId, matchId, won, tied, mu, sigma)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    """,
+                    int(winners[i].name),
+                    self.ctx.guild.id,
+                    self.id,
+                    not tied,
+                    tied,
+                    winners[i].mu,
+                    winners[i].sigma,
+                )
+
+                player = self._match.winner.players[i]
+                player.mu = winners[i].mu
+                player.sigma = winners[i].sigma
+                self._session_manager.player_cache.set(player.member.id, player)
+
+            for i in range(0, len(losers)):
+                await con.execute(
+                    """UPDATE members SET mu = $1, sigma = $2 WHERE userId = $3 AND guildId = $4""",
+                    losers[i].mu,
+                    losers[i].sigma,
+                    int(losers[i].name),
+                    self.ctx.guild.id,
+                )
+                await con.execute(
+                    """
+                    INSERT INTO memberAuditLog (userId, guildId, matchId, lost, tied, mu, sigma)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    """,
+                    int(losers[i].name),
+                    self.ctx.guild.id,
+                    self.id,
+                    not tied,
+                    tied,
+                    losers[i].mu,
+                    losers[i].sigma,
+                )
+
+                player = self._match.loser.players[i]
+                player.mu = losers[i].mu
+                player.sigma = losers[i].sigma
+                self._session_manager.player_cache.set(player.member.id, player)
+
     async def _save_match(self) -> None:
         """Persist the match associated with this session in the database."""
-        query = """
-        WITH new_members AS (
-        SELECT unnest($1::bigint[]) AS user_id,
-               unnest($2::bigint[]) AS guild_id
-        )
-        INSERT INTO members (userId, guildId, rank, wins, loses, ties)
-        SELECT user_id, guild_id, 0, {0}, {1}, {2}
-        FROM new_members
-        ON CONFLICT (userId, guildId)
-        DO UPDATE SET {3} = members.{3} + 1;
-        """
         if not self._match.winner:
             raise GameSessionError("Cannot save a match that isn't complete")
 
         match = self._match
-
-        if match.final_scores[0] != match.final_scores[1]:
-            winner_ids = [player.member.id for player in match.winner.players]
-            loser_ids = [player.member.id for player in match.loser.players]
-            guild_ids = [self.ctx.guild.id] * 4
-
-            await self.ctx.app.db.execute(query.format(*["1", "0", "0", "wins"]), winner_ids, guild_ids)
-            await self.ctx.app.db.execute(query.format(*["0", "1", "0", "loses"]), loser_ids, guild_ids)
-
-        else:
-            player_ids = [player.member.id for player in [*match.team1.players, *match.team2.players]]
-            guild_ids = [self.ctx.guild.id] * 8
-
-            await self.ctx.app.db.execute(query.format(*["0", "0", "1", "ties"]), player_ids, guild_ids)
 
         db_match = DatabaseMatch(
             self.id,
@@ -734,9 +793,10 @@ class GameSession:
             "round1Score": match.round1_scores[loser_index],
             "round2Score": match.round2_scores[loser_index],
         }
-        db_match.winner_data = json.dumps(winner_data)
-        db_match.loser_data = json.dumps(loser_data)
+        db_match.winner_data = winner_data
+        db_match.loser_data = loser_data
         await db_match.update()
+        await db_match.update_members()
 
     async def _wait_for_scores(self) -> None:
         """Start the game loop waiting for scores.
@@ -748,6 +808,9 @@ class GameSession:
         timeout: bool = False
 
         def update_match_stats() -> GameMatch:
+            if round_no == 1:
+                return self._match
+
             score1, score2 = self._latest_score
             winner = self._match.team1 if score1 > score2 else self._match.team2
 
@@ -767,10 +830,10 @@ class GameSession:
 
             return self._match
 
-        await self.ctx.send_round_update(round_no, self._match, map=self._map)
-
         # Update loop for scores
         while self.session_task and round_no < 3:
+            await self.ctx.send_round_update(round_no, update_match_stats(), map=self._map)
+
             try:
                 self.event.clear()
                 await asyncio.wait_for(self.event.wait(), timeout=3600)
@@ -779,7 +842,6 @@ class GameSession:
                 break
 
             round_no += 1
-            await self.ctx.send_round_update(round_no, update_match_stats(), map=self._map)
 
         self._session_task = None
         if sum(total_scores) == 0 or round_no < 3:
@@ -790,7 +852,9 @@ class GameSession:
             await self.ctx.edit_last_response(embed=embed, components=[])
             return
 
+        await self.ctx.send_round_update(round_no, update_match_stats(), map=self._map)
         await self._save_match()
+        await self._handle_ranking()
         await self.ctx.send_match_summary(self._match)
 
     def add_score(self, score1: int, score2: int) -> None:

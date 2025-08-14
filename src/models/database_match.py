@@ -8,6 +8,7 @@ import attr
 import hikari
 
 from src.models.database import DatabaseModel
+from src.models.errors import GameSessionError
 
 
 @attr.define
@@ -46,8 +47,8 @@ class DatabaseMatch(DatabaseModel):
             """,
             self.id,
             self.guild_id,
-            self.winner_data,
-            self.loser_data,
+            json.dumps(self.winner_data),
+            json.dumps(self.loser_data),
             self.tied,
             self.date,
             self.map,
@@ -81,6 +82,35 @@ class DatabaseMatch(DatabaseModel):
             winner_data=json.loads(record["winnerdata"]),
             loser_data=json.loads(record["loserdata"]),
             tied=record["matchtied"],
+        )
+
+    async def update_members(self) -> None:
+        """Update the individual players of this match based on the match results."""
+        if not self.winner_data or not self.loser_data:
+            raise GameSessionError("Cannot update members without match results")
+
+        query = """
+        WITH new_members AS (
+        SELECT unnest($1::bigint[]) AS user_id,
+               unnest($2::bigint[]) AS guild_id
+        )
+        INSERT INTO members (userId, guildId, rank, wins, loses, ties)
+        SELECT user_id, guild_id, 0, {0}, {1}, {2}
+        FROM new_members
+        ON CONFLICT (userId, guildId)
+        DO UPDATE SET {3} = members.{3} + 1;
+        """
+
+        if self.tied:
+            all_player_ids = [*self.winner_data["playerIds"], *self.loser_data["playerIds"]]
+            await self._db.execute(query.format(*["0", "0", "1", "ties"]), all_player_ids, [self.guild_id] * 8)
+            return
+
+        await self._db.execute(
+            query.format(*["1", "0", "0", "wins"]), self.winner_data["playerIds"], [self.guild_id] * 4
+        )
+        await self._db.execute(
+            query.format(*["0", "1", "0", "loses"]), self.loser_data["playerIds"], [self.guild_id] * 4
         )
 
 

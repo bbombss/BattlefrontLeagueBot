@@ -64,7 +64,7 @@ class BattlefrontBotContext(lightbulb.Context, ABC):
 
         assert self.previous_response is not None
 
-        if edit and await self.edit_last_response("", embed=embed, components=[]):
+        if edit and await self.edit_last_response("", embed=embed, components=[], attachment=None):
             return self.previous_response
 
         return await self.respond(embed=embed, flags=flags)
@@ -105,7 +105,7 @@ class BattlefrontBotContext(lightbulb.Context, ABC):
 
         assert self.previous_response is not None
 
-        if edit and await self.edit_last_response("", embed=embed, components=[]):
+        if edit and await self.edit_last_response("", embed=embed, components=[], attachment=None):
             return self.previous_response
 
         return await self.respond(embed=embed, flags=flags)

@@ -1,4 +1,5 @@
 import asyncio
+import bisect
 import datetime
 import os
 from collections import Counter
@@ -27,6 +28,79 @@ from src.utils import bot_in_channel, generate_game_banner, is_admin
 
 battlefront = BattlefrontBotPlugin("battlefront")
 battlefront.add_checks(lightbulb.checks.guild_only)
+
+
+class Fakemember:
+    """Fake member object used for testing."""
+
+    def __init__(self, id, display_name, role_ids, guild_id):
+        self.id = id
+        self.display_name = display_name
+        self.role_ids = role_ids
+        self.guild_id = guild_id
+
+
+def get_fake_members() -> list[Fakemember]:
+    """Will return a list of fake members for testing."""
+    return [
+        Fakemember(
+            1,
+            "bubbleBee30",
+            [
+                1384108414937993338,
+            ],
+            1042398810707591209,
+        ),
+        Fakemember(
+            2,
+            "gangkid2",
+            [
+                1384108414937993338,
+            ],
+            1042398810707591209,
+        ),
+        Fakemember(
+            3,
+            "Treehugs533",
+            [
+                1384108414937993338,
+            ],
+            1042398810707591209,
+        ),
+        Fakemember(
+            4,
+            "Dolphinlover6",
+            [
+                1384108482516488343,
+            ],
+            1042398810707591209,
+        ),
+        Fakemember(
+            5,
+            "bighay458",
+            [
+                1384108482516488343,
+            ],
+            1042398810707591209,
+        ),
+        Fakemember(
+            6,
+            "massiveballer2013",
+            [
+                1384108535478095883,
+            ],
+            1042398810707591209,
+        ),
+        Fakemember(
+            7,
+            "sigmamalemember2",
+            [
+                1384108535478095883,
+            ],
+            1042398810707591209,
+        ),
+        Fakemember(8, "robot3", [], 1042398810707591209),
+    ]
 
 
 @battlefront.command
@@ -71,7 +145,7 @@ async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
         return
 
     record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
-    if not record or None in record.values():
+    if not record or None in [record["rank1role"], record["rank2role"], record["rank3role"]]:
         await ctx.respond_with_failure(
             "Could not find rank roles for server, use `/roles` to configure rank roles", ephemeral=True
         )
@@ -179,13 +253,34 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
         await ctx.respond_with_failure("**This player has no stats**")
         return
 
+    ratings = {
+        -5: "Well below average",
+        -3: "Below average",
+        -1: "Slightly below average",
+        1: "Slightly above Average",
+        3: "Above average",
+        5: "Well above average",
+    }
+    thresholds = sorted(ratings)
+    has_rating = True
+
+    if db_member.mu is not None:
+        ordinal = round(ctx.app.game_session_manager.openskill_model.rating(db_member.mu, db_member.sigma).ordinal(), 3)
+        i = bisect.bisect_right(thresholds, round(ordinal)) - 1
+        if i < 0:
+            i = 0
+        rating = ratings[thresholds[i]]
+    else:
+        has_rating = False
+
     embed = hikari.Embed(
         title=player.display_name,
         description=f"**Wins:** {db_member.wins}\n**Loses:** {db_member.loses}\n"
-        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins + db_member.ties)), 3)}\n"
-        f"**MMR (Estimated):** {db_member.rank if db_member.rank != 0 else 'Not calibrated'}",
+        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins + db_member.ties)), 3)}\n",
         colour=DEFAULT_EMBED_COLOUR,
     )
+    if has_rating:
+        embed.add_field(name="OpenSkill Rating:", value=f"**{ordinal}**\n{rating}")
     embed.set_thumbnail(player.avatar_url)
     await ctx.respond(embed=embed)
 
@@ -346,7 +441,7 @@ async def mapvote(
 
     if len(view.votes) < 1:
         with suppress(hikari.NotFoundError):
-            await ctx.respond_with_failure("No one voted", edit=True)
+            await ctx.respond_with_failure("**No one voted**", edit=True)
         return
 
     vote_counts = Counter(view.votes.values())
@@ -419,7 +514,7 @@ async def matchsummary(ctx: BattlefrontBotSlashContext, id: int) -> None:
 
     embed = hikari.Embed(
         title=f"{match.winner_data['name']} vs {match.loser_data['name']}",
-        description=f"**{description} {winner_score} - {loser_score}{f' on {match.map}' if match.map else ''}**",
+        description=f"**{description} {winner_score} - {loser_score}**",
         colour=DEFAULT_EMBED_COLOUR,
         timestamp=match.date.astimezone(datetime.timezone.utc),
     )
@@ -462,20 +557,23 @@ async def forcestart(
         return
 
     record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
-    if not record or None in record.values():
+    if not record or None in [record["rank1role"], record["rank2role"], record["rank3role"]]:
         await ctx.respond_with_failure(
             "Could not find rank roles for server, use `/roles` to configure rank roles", ephemeral=True
         )
         return
 
     players = [player1, player2, player3, player4, player5, player6, player7, player8]
+
     if len({m.id for m in players}) != len(players):
         await ctx.respond_with_failure("**Duplicate users were given** each player must be unique", ephemeral=True)
         return
 
     session = GameSession(SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member))
 
-    await ctx.respond_with_success("**Started a match with forced teams**", ephemeral=True)
+    await ctx.respond_with_success(
+        f"**Started a match with forced teams: {ctx.app.game_session_manager.session_count + 1}**", ephemeral=True
+    )
     await ctx.app.game_session_manager.start_session(ctx.guild_id, session, players, force=True)
 
 

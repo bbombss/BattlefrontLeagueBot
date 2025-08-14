@@ -30,14 +30,20 @@ class DatabaseMember(DatabaseModel):
     ties: int = 0
     """The amount of ties for this member."""
 
+    mu: float | None = None
+    """The mu value of a player for the purposes of Openskill."""
+
+    sigma: float | None = None
+    """The sigma value of a player for the purposes of Openskill."""
+
     async def update(self) -> None:
         """Update this member or add them if not already stored."""
         await self._db.execute(
             """
-            INSERT INTO members (userId, guildId, rank, wins, loses, ties)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO members (userId, guildId, rank, wins, loses, ties, mu, sigma)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (userId, guildId) DO
-            UPDATE SET rank = $3, wins = $4, loses = $5, ties = $6;
+            UPDATE SET rank = $3, wins = $4, loses = $5, ties = $6, mu = $7, sigma = $8;
             """,
             int(self.id),
             int(self.guild_id),
@@ -45,6 +51,8 @@ class DatabaseMember(DatabaseModel):
             self.wins,
             self.loses,
             self.ties,
+            self.mu,
+            self.sigma,
         )
 
     @classmethod
@@ -71,7 +79,7 @@ class DatabaseMember(DatabaseModel):
         )
 
         if not record:
-            member = cls(hikari.Snowflake(user), hikari.Snowflake(guild), rank=0, wins=0, loses=0, ties=0)
+            member = cls(hikari.Snowflake(user), hikari.Snowflake(guild))
             return member
 
         return cls(
@@ -81,6 +89,8 @@ class DatabaseMember(DatabaseModel):
             wins=record["wins"],
             loses=record["loses"],
             ties=record["ties"],
+            mu=float(record["mu"]) if record["mu"] is not None else None,
+            sigma=float(record["sigma"]) if record["sigma"] is not None else None,
         )
 
     async def remove(self) -> None:

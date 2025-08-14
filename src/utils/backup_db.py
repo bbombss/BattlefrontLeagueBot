@@ -50,7 +50,9 @@ async def backup_db() -> hikari.File | None:
         backup_path,
         db_name,
     ]
-    env = {"PGPASSWORD": password, "SYSTEMROOT": os.environ["SYSTEMROOT"]}
+    env = {"PGPASSWORD": password}
+    if os.name == "nt":
+        env["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
 
     p = await asyncio.create_subprocess_exec(*cmd, stderr=asyncio.subprocess.PIPE, env=env)
 

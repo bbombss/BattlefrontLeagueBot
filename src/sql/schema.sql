@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS guilds
     rank1Role bigint,
     rank2Role bigint,
     rank3Role bigint,
+    rank0Role bigint,
+    matchPingChannel bigint,
     PRIMARY KEY (guildId)
 );
 
@@ -28,17 +30,20 @@ CREATE TABLE IF NOT EXISTS members
     wins smallint,
     loses smallint,
     ties smallint,
+    mu numeric(16, 14),
+    sigma numeric(16, 14),
     PRIMARY KEY (userId, guildId),
     FOREIGN KEY (guildId) REFERENCES guilds (guildId)
         ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS maps
+CREATE TABLE IF NOT EXISTS mapBans
 (
-    mapId bigint NOT NULL,
     mapName text NOT NULL,
-    imageUrl text,
-    PRIMARY KEY (mapId)
+    guildId bigint NOT NULL,
+    PRIMARY KEY (mapName, guildId),
+    FOREIGN KEY (guildId) REFERENCES guilds (guildId)
+        ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS matches
@@ -52,6 +57,24 @@ CREATE TABLE IF NOT EXISTS matches
     mapName text,
     PRIMARY KEY (matchId),
     FOREIGN KEY (guildId) REFERENCES guilds (guildId)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS memberAuditLog
+(
+    logId serial NOT NULL,
+    userId bigint NOT NULL,
+    guildId bigint NOT NULL,
+    matchId bigint,
+    won bool NOT NULL DEFAULT false,
+    lost bool NOT NULL DEFAULT false,
+    tied bool NOT NULL DEFAULT false,
+    mu numeric(16, 14),
+    sigma numeric(16, 14),
+    PRIMARY KEY (logId),
+    FOREIGN KEY (userId, guildId) REFERENCES members (userId, guildId)
+        ON DELETE CASCADE,
+    FOREIGN KEY (matchId) REFERENCES matches (matchId)
         ON DELETE CASCADE
 );
 
