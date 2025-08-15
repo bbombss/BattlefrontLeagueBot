@@ -536,6 +536,7 @@ class GameSession:
         """Fetch the rank role ids for this session from the database."""
         record = await self.ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", self.ctx.guild.id)
         self._rank_roles = {
+            0: hikari.Snowflake(record["rank0role"]),
             1: hikari.Snowflake(record["rank1role"]),
             2: hikari.Snowflake(record["rank2role"]),
             3: hikari.Snowflake(record["rank3role"]),
@@ -558,14 +559,16 @@ class GameSession:
         rank_role: int | None = None
 
         for role in member.role_ids:
-            for i in range(1, 4):
+            for i in range(0, 4):
                 if role == self.rank_roles[i]:
                     rank_role = i
                     break
 
-        if not rank_role:
-            rank_role = 1
-            await self.ctx.warn(f"Assigned rank 1 to {member.display_name} because they do not have a rank role")
+        if rank_role is None:
+            rank_role = 0
+            await self.ctx.warn(
+                f"Assigned rank 0 (White) to {member.display_name} because they do not have a rank role"
+            )
 
         db_member = await DatabaseMember.fetch(member.id, member.guild_id)
 
@@ -843,8 +846,7 @@ class GameSession:
 
             round_no += 1
 
-        self._session_task = None
-        if sum(total_scores) == 0 or round_no < 3:
+        if sum(total_scores) == 0 or not self.session_task:
             embed = hikari.Embed(
                 description=f"{FAIL_EMOJI} **Session was ended{' due to a timeout' if timeout else ''}**",
                 colour=FAIL_EMBED_COLOUR,
@@ -852,6 +854,7 @@ class GameSession:
             await self.ctx.edit_last_response(embed=embed, components=[])
             return
 
+        self._session_task = None
         await self.ctx.send_round_update(round_no, update_match_stats(), map=self._map)
         await self._save_match()
         await self._handle_ranking()

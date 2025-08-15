@@ -5,7 +5,6 @@ import os
 from collections import Counter
 from contextlib import suppress
 from io import BytesIO
-from itertools import islice
 from random import randint
 
 import hikari
@@ -30,86 +29,16 @@ battlefront = BattlefrontBotPlugin("battlefront")
 battlefront.add_checks(lightbulb.checks.guild_only)
 
 
-class Fakemember:
-    """Fake member object used for testing."""
-
-    def __init__(self, id, display_name, role_ids, guild_id):
-        self.id = id
-        self.display_name = display_name
-        self.role_ids = role_ids
-        self.guild_id = guild_id
-
-
-def get_fake_members() -> list[Fakemember]:
-    """Will return a list of fake members for testing."""
-    return [
-        Fakemember(
-            1,
-            "bubbleBee30",
-            [
-                1384108414937993338,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            2,
-            "gangkid2",
-            [
-                1384108414937993338,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            3,
-            "Treehugs533",
-            [
-                1384108414937993338,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            4,
-            "Dolphinlover6",
-            [
-                1384108482516488343,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            5,
-            "bighay458",
-            [
-                1384108482516488343,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            6,
-            "massiveballer2013",
-            [
-                1384108535478095883,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(
-            7,
-            "sigmamalemember2",
-            [
-                1384108535478095883,
-            ],
-            1042398810707591209,
-        ),
-        Fakemember(8, "robot3", [], 1042398810707591209),
-    ]
-
-
 @battlefront.command
-@lightbulb.option("green", "The role for green (rank 1)", type=hikari.Role, required=True)
-@lightbulb.option("yellow", "The role for yellow (rank 2)", type=hikari.Role, required=True)
 @lightbulb.option("red", "The role for red (rank 3)", type=hikari.Role, required=True)
+@lightbulb.option("yellow", "The role for yellow (rank 2)", type=hikari.Role, required=True)
+@lightbulb.option("green", "The role for green (rank 1)", type=hikari.Role, required=True)
+@lightbulb.option("white", "The role for white (rank 0)", type=hikari.Role, required=True)
 @lightbulb.command("roles", description="Set the roles that determine player rank", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
-async def set_roles(ctx: BattlefrontBotSlashContext, green: hikari.Role, yellow: hikari.Role, red: hikari.Role) -> None:
+async def set_roles(
+    ctx: BattlefrontBotSlashContext, red: hikari.Role, yellow: hikari.Role, green: hikari.Role, white: hikari.Role
+) -> None:
     if not is_admin(ctx.member):
         await ctx.respond_with_failure("**Only administrators can set roles**", ephemeral=True)
         return
@@ -117,12 +46,13 @@ async def set_roles(ctx: BattlefrontBotSlashContext, green: hikari.Role, yellow:
     await ctx.app.db.execute(
         """
         UPDATE guilds
-        SET rank1Role = $1, rank2Role = $2, rank3Role = $3
-        WHERE guildId = $4
+        SET rank1Role = $1, rank2Role = $2, rank3Role = $3, rank0Role = $4
+        WHERE guildId = $5
         """,
         green.id,
         yellow.id,
         red.id,
+        white.id,
         ctx.guild_id,
     )
 
@@ -145,7 +75,7 @@ async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
         return
 
     record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
-    if not record or None in [record["rank1role"], record["rank2role"], record["rank3role"]]:
+    if not record or None in [record[f"rank{i}role"] for i in range(0, 4)]:
         await ctx.respond_with_failure(
             "Could not find rank roles for server, use `/roles` to configure rank roles", ephemeral=True
         )
@@ -182,6 +112,7 @@ async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     embed.set_footer("Starting session...")
 
     await message.edit(embed=embed, components=[])
+    await ctx.app.rest.create_message(ctx.channel_id, f"{ctx.user.mention}", user_mentions=True)
 
     session = GameSession(SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member))
 
@@ -286,56 +217,67 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
 
 
 @battlefront.command
-@lightbulb.add_cooldown(30, 1, lightbulb.buckets.GuildBucket)
+@lightbulb.add_cooldown(60, 3, lightbulb.buckets.GuildBucket)
+@lightbulb.option("type", "Type of leaderboard to get", type=str, required=True, choices=["Wins", "Win/loss", "Ranks"])
 @lightbulb.command("leaderboard", description="Shows the leaderboard for this server", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
-async def leaderboard(ctx: BattlefrontBotSlashContext) -> None:
+async def leaderboard(ctx: BattlefrontBotSlashContext, type: str) -> None:
     with suppress(hikari.ForbiddenError):
         await ctx.app.rest.trigger_typing(ctx.channel_id)
 
-    records = await ctx.app.db.fetch("SELECT * FROM members WHERE guildId = $1", ctx.guild_id)
+    records = await ctx.app.db.fetch(
+        """
+        WITH stats AS (
+            SELECT
+                userid,
+                wins,
+                loses,
+                ties,
+                mu,
+                sigma,
+                wins::float / NULLIF(wins + loses + ties, 0) AS win_loss,
+                (mu - 3 * sigma) AS rating
+            FROM members WHERE guildId = $1
+        )
+        SELECT userid, wins, win_loss, rating FROM stats
+        ORDER BY
+            CASE WHEN $2 = 'Wins' THEN wins END DESC,
+            CASE WHEN $2 = 'Win/loss' THEN win_loss END DESC,
+            CASE WHEN $2 = 'Ranks' THEN rating END DESC
+        LIMIT 10;
+        """,
+        ctx.guild_id,
+        type,
+    )
 
     if not records:
         await ctx.respond_with_failure("**This server has no stats**")
         return
 
-    guild_members = await ctx.app.rest.fetch_members(ctx.guild_id)  # Better off making one bulk call then many
+    user_ids = [record["userid"] for record in records]
+    fetch_tasks = [ctx.app.rest.fetch_member(ctx.guild_id, user_id) for user_id in user_ids]
+    members = await asyncio.gather(*fetch_tasks, return_exceptions=True)
 
-    member_wins = {}
-    member_wl = {}
-    for record in records:
-        if record["wins"] == 0:
+    member_stats = {}
+    for record, member in zip(records, members):
+        if isinstance(member, Exception):
             continue
 
-        for member in guild_members:
-            if member.id == record["userid"]:
-                member_wins[member] = record["wins"]
-                member_wl[member] = round((record["wins"] / sum([record["loses"], record["wins"], record["ties"]])), 3)
+        if type == "Wins":
+            member_stats[member] = record["wins"]
+        elif type == "Win/loss":
+            member_stats[member] = round(record["win_loss"], 3)
+        elif type == "Ranks":
+            member_stats[member] = round(record["rating"], 3)
 
-    if len(member_wins) == 0:
+    if len(member_stats) == 0:
         await ctx.respond_with_failure("**This server has no stats**")
         return
 
-    member_wins = dict(sorted(member_wins.items(), key=lambda item: item[1], reverse=True))
-    member_wl = dict(sorted(member_wl.items(), key=lambda item: item[1], reverse=True))
-    if len(member_wins) > 10:
-        member_wins = dict(islice(member_wins.items(), 10))
-        member_wl = dict(islice(member_wl.items(), 10))
-
     embed = hikari.Embed(
-        title="LeaderBoard",
-        description="",
+        title=f"{type} LeaderBoard",
+        description="\n".join(f"**{member.display_name}:** {member_stats[member]}" for member in member_stats),
         colour=DEFAULT_EMBED_COLOUR,
-    )
-    embed.add_field(
-        name="Wins ------------ ",
-        value="\n".join(f"**{member.display_name}:** {member_wins[member]}" for member in member_wins),
-        inline=True,
-    )
-    embed.add_field(
-        name="Win/Loss Ratio ------------ ",
-        value="\n".join(f"**{member.display_name}:** {member_wl[member]}" for member in member_wl),
-        inline=True,
     )
     await ctx.respond(embed=embed)
 
@@ -409,6 +351,9 @@ async def mapvote(
         maps = [map1, map2]
         if map3:
             maps.append(map3)
+        if len(set(maps)) < len(maps):
+            await ctx.respond_with_failure("**All custom maps must be unique**", ephemeral=True)
+            return
     else:
         await ctx.respond_with_failure(
             "**You did not specify an amount of random maps or enough custom maps**", ephemeral=True
@@ -557,7 +502,7 @@ async def forcestart(
         return
 
     record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
-    if not record or None in [record["rank1role"], record["rank2role"], record["rank3role"]]:
+    if not record or None in [record[f"rank{i}role"] for i in range(0, 4)]:
         await ctx.respond_with_failure(
             "Could not find rank roles for server, use `/roles` to configure rank roles", ephemeral=True
         )

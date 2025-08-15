@@ -1,4 +1,5 @@
 import typing as t
+from collections import Counter
 
 import hikari
 import lightbulb
@@ -333,6 +334,12 @@ class CapsVotingView(miru.View):
         if len(self.votes) == 8:
             self.stop()
 
+        # Majority vote
+        elif len(self.votes) > 4:
+            counts = Counter(self.votes.values())
+            if any(i > 4 for i in counts.values()):
+                self.stop()
+
         await self._update_embed()
 
     @miru.button("1", style=hikari.ButtonStyle.PRIMARY)
@@ -379,9 +386,7 @@ class CapsVotingView(miru.View):
             )
             return
 
-        await ctx.respond(
-            "**Regenerating teams**\n*Note: You can only regenerate teams 3 times*", flags=hikari.MessageFlag.EPHEMERAL
-        )
+        await ctx.respond("**Regenerating teams**", flags=hikari.MessageFlag.EPHEMERAL)
 
         self.votes.clear()
         self.votes[ctx.user.id] = 5
@@ -430,12 +435,20 @@ class MapVotingView(miru.View):
                 await self.status_message.delete()
             self.stop()
 
-        elif len(self.votes) > 4 and self.players:
-            waiting_on = [p.display_name for p in self.players if p.id not in self.votes]
-            if self.status_message:
-                await self.status_message.edit(f"Waiting for {', '.join(waiting_on)}")
-                return
-            self.status_message = await ctx.respond(f"Waiting for {', '.join(waiting_on)}")
+        elif len(self.votes) > 4:
+            # Majority vote
+            counts = Counter(self.votes.values())
+            if any(i > 4 for i in counts.values()):
+                if self.status_message:
+                    await self.status_message.delete()
+                self.stop()
+
+            elif self.players:
+                waiting_on = [p.display_name for p in self.players if p.id not in self.votes]
+                if self.status_message:
+                    await self.status_message.edit(f"Waiting for {', '.join(waiting_on)}")
+                    return
+                self.status_message = await ctx.respond(f"Waiting for {', '.join(waiting_on)}")
 
 
 class CapsRegisterView(miru.View):
