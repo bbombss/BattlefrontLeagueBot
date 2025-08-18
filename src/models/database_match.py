@@ -113,6 +113,23 @@ class DatabaseMatch(DatabaseModel):
             query.format(*["0", "1", "0", "loses"]), self.loser_data["playerIds"], [self.guild_id] * 4
         )
 
+    async def amend_members(self) -> None:
+        """Amend the individual players of this match by reversing the results."""
+        if not self.winner_data or not self.loser_data:
+            raise GameSessionError("Cannot update members without match results")
+
+        query = """
+       WITH new_members AS (
+       SELECT unnest($1::bigint[]) AS user_id,
+              unnest($2::bigint[]) AS guild_id
+       )
+       UPDATE members SET {0} = members.{0} + 1, {1} = members.{1} - 1
+       FROM new_members nm 
+       WHERE members.userId = nm.user_id AND members.guildId = nm.guild_id;
+       """
+        await self._db.execute(query.format(*["wins", "loses"]), self.winner_data["playerIds"], [self.guild_id] * 4)
+        await self._db.execute(query.format(*["loses", "wins"]), self.loser_data["playerIds"], [self.guild_id] * 4)
+
 
 # Copyright (C) 2025 BBombs
 

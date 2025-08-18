@@ -63,15 +63,17 @@ async def set_roles(
 @lightbulb.option(
     "timeout", "How long the bot should wait for 8 players", default=30, type=int, required=False, max_value=999
 )
-@lightbulb.command("start", description="Starts a game session", pass_options=True)
+@lightbulb.command("start", description="Starts a game session for this channel", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
-    if not await bot_in_channel(ctx):
+    channel = ctx.get_channel()
+
+    if not await bot_in_channel(ctx) or not isinstance(channel, hikari.TextableGuildChannel):
         await ctx.respond_with_failure("**The bot needs access to this channel for this command**", ephemeral=True)
         return
 
-    if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
-        await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)
+    if ctx.app.game_session_manager.fetch_session(ctx.channel_id):
+        await ctx.respond_with_failure("**There is already a game session running in this channel**", ephemeral=True)
         return
 
     record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
@@ -93,7 +95,7 @@ async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
     resp = await ctx.respond(embed=embed, components=view)
 
     message = await resp.message()
-    ctx.app.game_session_manager.last_registration_message[ctx.guild_id] = message.id
+    ctx.app.game_session_manager.last_registration_message[ctx.channel_id] = message.id
     ctx.app.miru_client.start_view(view, bind_to=message)
     await view.wait()
 
@@ -109,17 +111,20 @@ async def start_caps(ctx: BattlefrontBotSlashContext, timeout: int) -> None:
 
     embed = hikari.Embed(description=f"{SUCCESS_EMOJI} **Registration Complete**", colour=DEFAULT_EMBED_COLOUR)
     embed.add_field(name="Participants:", value="\n".join([user.display_name for user in view.registered_members]))
-    embed.set_footer("Starting session...")
+    embed.set_footer(f"Session: {ctx.app.game_session_manager.session_count + 1}")
+
+    if ctx.app.game_session_manager.fetch_session(ctx.channel_id):
+        embed = hikari.Embed(
+            description=f"{FAIL_EMOJI} **Registration cancelled because there is another session in this channel**",
+            colour=FAIL_EMBED_COLOUR,
+        )
 
     await message.edit(embed=embed, components=[])
     await ctx.app.rest.create_message(ctx.channel_id, f"{ctx.user.mention}", user_mentions=True)
 
-    session = GameSession(SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member))
+    session = GameSession(SessionContext(ctx.app, ctx.get_guild(), channel, ctx.member))
 
-    embed.set_footer(f"Session: {ctx.app.game_session_manager.session_count + 1}")
-    await message.edit(embed=embed)
-
-    await ctx.app.game_session_manager.start_session(ctx.guild_id, session, view.registered_members)
+    await ctx.app.game_session_manager.start_session(ctx.channel_id, session, view.registered_members)
 
 
 @battlefront.command
@@ -132,11 +137,11 @@ async def remove_player(ctx: BattlefrontBotSlashContext, player: hikari.Member) 
         return
 
     view: miru.View | None = None
-    if message_id := ctx.app.game_session_manager.last_registration_message[ctx.guild_id]:
+    if message_id := ctx.app.game_session_manager.last_registration_message[ctx.channel_id]:
         view = ctx.app.miru_client.get_bound_view(message_id)
 
     if view is None or not isinstance(view, CapsRegisterView):
-        await ctx.respond_with_failure("**No registration component found for this server**", ephemeral=True)
+        await ctx.respond_with_failure("**No registration component found for this channel**", ephemeral=True)
         return
 
     if not any(player.id == m.id for m in view.registered_members):
@@ -162,16 +167,57 @@ async def remove_player(ctx: BattlefrontBotSlashContext, player: hikari.Member) 
 @lightbulb.command("score", description="Add a score to an ongoing session", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def caps_score(ctx: BattlefrontBotSlashContext, team1score: int, team2score: int) -> None:
-    session = ctx.app.game_session_manager.fetch_session(ctx.guild_id)
+    session = ctx.app.game_session_manager.fetch_session(ctx.channel_id)
     if not session or not session.session_task:
-        await ctx.respond_with_failure("**Could not find a game session for this server**", ephemeral=True)
+        await ctx.respond_with_failure("**Could not find a game session for this channel**", ephemeral=True)
         return
     if session.ctx.author.id != ctx.author.id:
         await ctx.respond_with_failure("**You cannot add a score to this session**", ephemeral=True)
         return
 
-    ctx.app.game_session_manager.add_session_score(ctx.guild_id, team1score, team2score)
+    ctx.app.game_session_manager.add_session_score(ctx.channel_id, team1score, team2score)
     await ctx.respond_with_success("**Added score to session successfully**", ephemeral=True)
+
+
+@battlefront.command
+@lightbulb.option("id", "The ID of the match", type=int, required=True)
+@lightbulb.command("amend", description="Amend a match by swapping the winner and loser", pass_options=True)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def amend_match(ctx: BattlefrontBotSlashContext, id: int) -> None:
+    if not is_admin(ctx.member):
+        await ctx.respond_with_failure("**Only administrators can amend matches**", ephemeral=True)
+        return
+
+    match = await DatabaseMatch.fetch(id)
+    if not match.guild_id or match.guild_id != ctx.guild_id:
+        await ctx.respond_with_failure("**No such match exists**", ephemeral=True)
+        return
+
+    if match.tied:
+        await ctx.respond_with_failure("**Cannot amend a tied match**", ephemeral=True)
+        return
+
+    winner_score = int(match.winner_data["round1Score"]) + int(match.winner_data["round2Score"])
+    loser_score = int(match.loser_data["round1Score"]) + int(match.loser_data["round2Score"])
+
+    confirmation = await ctx.get_confirmation(
+        f"**Are you sure you want to swap the winner and loser of this match:**\n"
+        f"*Note: While wins and similar stats will be updated player ranking cannot and will not be altered*\n"
+        f"Winner: **{match.winner_data['name']}** ({winner_score})\n"
+        f"Loser: **{match.loser_data['name']}** ({loser_score})"
+    )
+
+    if confirmation:
+        winner_data = match.winner_data
+        match.winner_data = match.loser_data
+        match.loser_data = winner_data
+        await match.update()
+        await match.amend_members()
+
+        await ctx.respond_with_success("**Amended the match successfully**", edit=True)
+        return
+
+    await ctx.respond_with_failure("**Cancelled amending**", edit=True)
 
 
 @battlefront.command
@@ -206,8 +252,8 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
 
     embed = hikari.Embed(
         title=player.display_name,
-        description=f"**Wins:** {db_member.wins}\n**Loses:** {db_member.loses}\n"
-        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins + db_member.ties)), 3)}\n",
+        description=f"**Wins:** {db_member.wins}\n**Loses:** {db_member.loses}\n**Ties:** {db_member.ties}\n"
+        f"**Win/loss:** {round((db_member.wins / (db_member.loses + db_member.wins + db_member.ties)), 3)}",
         colour=DEFAULT_EMBED_COLOUR,
     )
     if has_rating:
@@ -222,9 +268,6 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
 @lightbulb.command("leaderboard", description="Shows the leaderboard for this server", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def leaderboard(ctx: BattlefrontBotSlashContext, type: str) -> None:
-    with suppress(hikari.ForbiddenError):
-        await ctx.app.rest.trigger_typing(ctx.channel_id)
-
     records = await ctx.app.db.fetch(
         """
         WITH stats AS (
@@ -255,19 +298,18 @@ async def leaderboard(ctx: BattlefrontBotSlashContext, type: str) -> None:
         return
 
     user_ids = [record["userid"] for record in records]
-    fetch_tasks = [ctx.app.rest.fetch_member(ctx.guild_id, user_id) for user_id in user_ids]
-    members = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+    members = [ctx.app.cache.get_member(ctx.guild_id, user_id) for user_id in user_ids]
 
     member_stats = {}
     for record, member in zip(records, members):
-        if isinstance(member, Exception):
-            continue
+        if member is None:
+            await ctx.app.rest.fetch_member(ctx.guild_id, record["userid"])
 
-        if type == "Wins":
+        if type == "Wins" and record["wins"] is not None:
             member_stats[member] = record["wins"]
-        elif type == "Win/loss":
+        elif type == "Win/loss" and record["win_loss"] is not None:
             member_stats[member] = round(record["win_loss"], 3)
-        elif type == "Ranks":
+        elif type == "Ranks" and record["rating"] is not None:
             member_stats[member] = round(record["rating"], 3)
 
     if len(member_stats) == 0:
@@ -370,7 +412,7 @@ async def mapvote(
         return
 
     players = None
-    if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
+    if session := ctx.app.game_session_manager.fetch_session(ctx.channel_id):
         players = [p.member for p in session.players]
 
     options = [miru.SelectOption(map, value=map) for map in maps]
@@ -392,16 +434,19 @@ async def mapvote(
     vote_counts = Counter(view.votes.values())
     winner_vote, winner_count = vote_counts.most_common(1)[0]
 
-    await ctx.edit_last_response(
-        "",
-        embed=hikari.Embed(
-            title=f"{winner_vote} won with {winner_count}/{len(view.votes)} votes", colour=DEFAULT_EMBED_COLOUR
-        ).set_image(map_image_path_for(winner_vote)),
-        components=[],
-    )
+    try:
+        await ctx.edit_last_response(
+            "",
+            embed=hikari.Embed(
+                title=f"{winner_vote} won with {winner_count}/{len(view.votes)} votes", colour=DEFAULT_EMBED_COLOUR
+            ).set_image(map_image_path_for(winner_vote)),
+            components=[],
+        )
+    except hikari.NotFoundError:
+        return
 
-    if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
-        session.set_map(map_image_path_for(winner_vote))
+    if session := ctx.app.game_session_manager.fetch_session(ctx.channel_id):
+        session.set_map(winner_vote)
 
 
 @battlefront.command
@@ -417,9 +462,9 @@ async def get_map(ctx: BattlefrontBotSlashContext, name: str) -> None:
 
     await ctx.respond(embed=hikari.Embed(title=name, colour=DEFAULT_EMBED_COLOUR).set_image(img_path))
 
-    ctx.app.game_session_manager.last_map[ctx.guild_id] = name
-    if session := ctx.app.game_session_manager.fetch_session(ctx.guild_id):
-        session.set_map(img_path)
+    ctx.app.game_session_manager.last_map[ctx.channel_id] = name
+    if session := ctx.app.game_session_manager.fetch_session(ctx.channel_id):
+        session.set_map(name)
 
 
 @battlefront.command
@@ -493,12 +538,14 @@ async def forcestart(
     player7: hikari.Member,
     player8: hikari.Member,
 ) -> None:
-    if not await bot_in_channel(ctx):
+    channel = ctx.get_channel()
+
+    if not await bot_in_channel(ctx) or not isinstance(channel, hikari.TextableGuildChannel):
         await ctx.respond_with_failure("**The bot needs access to this channel for this command**", ephemeral=True)
         return
 
-    if ctx.app.game_session_manager.fetch_session(ctx.guild_id):
-        await ctx.respond_with_failure("**There is already a game session running in this server**", ephemeral=True)
+    if ctx.app.game_session_manager.fetch_session(ctx.channel_id):
+        await ctx.respond_with_failure("**There is already a game session running in this channel**", ephemeral=True)
         return
 
     record = await ctx.app.db.fetchrow("SELECT * FROM guilds WHERE guildId = $1", ctx.guild_id)
@@ -514,12 +561,12 @@ async def forcestart(
         await ctx.respond_with_failure("**Duplicate users were given** each player must be unique", ephemeral=True)
         return
 
-    session = GameSession(SessionContext(ctx.app, ctx.get_guild(), ctx.get_channel(), ctx.member))
+    session = GameSession(SessionContext(ctx.app, ctx.get_guild(), channel, ctx.member))
 
     await ctx.respond_with_success(
         f"**Started a match with forced teams: {ctx.app.game_session_manager.session_count + 1}**", ephemeral=True
     )
-    await ctx.app.game_session_manager.start_session(ctx.guild_id, session, players, force=True)
+    await ctx.app.game_session_manager.start_session(ctx.channel_id, session, players, force=True)
 
 
 @battlefront.command
@@ -538,9 +585,9 @@ async def flushcache(ctx: BattlefrontBotSlashContext) -> None:
 @lightbulb.command("end", description="Stops an ongoing session")
 @lightbulb.implements(lightbulb.SlashCommand)
 async def end_session(ctx: BattlefrontBotSlashContext) -> None:
-    session = ctx.app.game_session_manager.fetch_session(ctx.guild_id)
+    session = ctx.app.game_session_manager.fetch_session(ctx.channel_id)
     if not session:
-        await ctx.respond_with_failure("**Could not find a game session for this server**", ephemeral=True)
+        await ctx.respond_with_failure("**Could not find a game session for this channel**", ephemeral=True)
         return
 
     if session.ctx.author.id != ctx.author.id and not is_admin(ctx.member):
@@ -548,12 +595,12 @@ async def end_session(ctx: BattlefrontBotSlashContext) -> None:
         return
 
     if not session.session_task:
-        ctx.app.game_session_manager.remove_session(ctx.guild_id)
+        ctx.app.game_session_manager.remove_session(ctx.channel_id)
         await ctx.respond_with_failure("**Could not connect to session but ended it anyway**", ephemeral=True)
         return
 
-    ctx.app.game_session_manager.end_session(ctx.guild_id)
-    ctx.app.game_session_manager.remove_session(ctx.guild_id)  # Just in case
+    ctx.app.game_session_manager.end_session(ctx.channel_id)
+    ctx.app.game_session_manager.remove_session(ctx.channel_id)  # Just in case
 
     await ctx.respond_with_success("**Ended session successfully**", ephemeral=True)
 

@@ -108,10 +108,13 @@ async def ext_unload(ctx: BattlefrontBotPrefixContext, extension: str) -> None:
 
 
 @admin.command
-@lightbulb.command("sync", "Sync application commands")
+@lightbulb.option("force", "Purge commands and then sync", type=bool, required=False)
+@lightbulb.command("sync", "Sync application commands", pass_options=True)
 @lightbulb.implements(lightbulb.PrefixCommand)
-async def sync_commands(ctx: BattlefrontBotPrefixContext) -> None:
+async def sync_commands(ctx: BattlefrontBotPrefixContext, force: bool) -> None:
     await ctx.loading()
+    if force:
+        await ctx.app.purge_application_commands(*ctx.app.default_enabled_guilds, global_commands=True)
     await ctx.app.sync_application_commands()
     await ctx.respond_with_success("**Synced application commands**", edit=True)
 

@@ -64,8 +64,8 @@ class GameSessionManager:
         self._app = app
         self._sessions: dict[hikari.Snowflake, GameSession] = {}
         self._player_cache = PlayerCache()
-        self._last_registration_message = {}
-        self._last_map = {}
+        self._last_registration_message: dict[hikari.Snowflake, hikari.Snowflake] = {}
+        self._last_map: dict[hikari.Snowflake, str] = {}
         self._session_count: int | None = None
         self._openskill_model = PlackettLuce(balance=True)
 
@@ -89,12 +89,12 @@ class GameSessionManager:
 
     @property
     def last_registration_message(self) -> dict[hikari.Snowflake, hikari.Snowflake]:
-        """A dictionary of guild ids and the id of their most recent registration message."""
+        """A dictionary of channel ids and the id of their most recent registration message."""
         return self._last_registration_message
 
     @property
     def last_map(self) -> dict[hikari.Snowflake, str]:
-        """A dictionary of guild ids and their most recently requested map."""
+        """A dictionary of channel ids and their most recently requested map."""
         return self._last_map
 
     @property
@@ -111,14 +111,14 @@ class GameSessionManager:
         self._session_count = 0
 
     async def start_session(
-        self, guild_id: hikari.Snowflake, session: GameSession, members: list[hikari.Member], force: bool = False
+        self, channel_id: hikari.Snowflake, session: GameSession, members: list[hikari.Member], force: bool = False
     ) -> None:
         """Start a session.
 
         Parameters
         ----------
-        guild_id : hikari.Snowflake
-            The guild id this session is to be bound to.
+        channel_id : hikari.Snowflake
+            The channel id this session is to be bound to.
         session : GameSession
             The game session that is being started.
         members : list[hikari.Member]
@@ -127,17 +127,17 @@ class GameSessionManager:
             Whether a set of teams is being forced, defaults to False
 
         """
-        self._sessions[guild_id] = session
+        self._sessions[channel_id] = session
         self._session_count += 1
-        await self._sessions[guild_id].start(members, force)
+        await self._sessions[channel_id].start(members, force)
 
-    def fetch_session(self, guild_id: hikari.Snowflake) -> GameSession | None:
+    def fetch_session(self, channel_id: hikari.Snowflake) -> GameSession | None:
         """Fetch a session from a guild, returns none if this guild has no session.
 
         Parameters
         ----------
-        guild_id : hikari.Snowflake
-            The guild id for the session that is being fetched is bound to.
+        channel_id : hikari.Snowflake
+            The channel id for the session that is being fetched is bound to.
 
         Returns
         -------
@@ -145,47 +145,47 @@ class GameSessionManager:
             The game session or None if no game session is bound to this guild.
 
         """
-        return self._sessions.get(guild_id)
+        return self._sessions.get(channel_id)
 
-    def add_session_score(self, guild_id: hikari.Snowflake, score1: int, score2: int) -> None:
+    def add_session_score(self, channel_id: hikari.Snowflake, score1: int, score2: int) -> None:
         """Add game results to a session.
 
         Parameters
         ----------
-        guild_id : hikari.Snowflake
-            The guild id for the session that is being updated is bound to.
+        channel_id : hikari.Snowflake
+            The channel id for the session that is being updated is bound to.
         score1 : int
             The score for the first team.
         score2 : int
             The score for the second team.
 
         """
-        session = self.fetch_session(guild_id)
+        session = self.fetch_session(channel_id)
         session.add_score(score1, score2)
         session.event.set()
 
-    def end_session(self, guild_id: hikari.Snowflake) -> None:
+    def end_session(self, channel_id: hikari.Snowflake) -> None:
         """End an ongoing session.
 
         Parameters
         ----------
-        guild_id : hikari.Snowflake
-            The guild id for the session that is being ended is bound to.
+        channel_id : hikari.Snowflake
+            The channel id for the session that is being ended is bound to.
 
         """
-        self.fetch_session(guild_id).end()
+        self.fetch_session(channel_id).end()
 
-    def remove_session(self, guild_id: hikari.Snowflake) -> None:
+    def remove_session(self, channel_id: hikari.Snowflake) -> None:
         """Remove a session from the game session manager if it exists.
 
         Parameters
         ----------
-        guild_id : hikari.Snowflake
-            The guild id for the session that is being removed is bound to.
+        channel_id : hikari.Snowflake
+            The channel id for the session that is being removed is bound to.
 
         """
-        if self.fetch_session(guild_id):
-            self._sessions.pop(guild_id)
+        if self.fetch_session(channel_id):
+            self._sessions.pop(channel_id)
 
 
 # Copyright (C) 2025 BBombs

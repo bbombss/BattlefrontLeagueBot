@@ -22,7 +22,7 @@ SUCCESS_EMOJI: str = "<:confirm:1219174344203436042>"
 FAIL_EMOJI: str = "<:cancel:1219185372710572092>"
 LOADING_EMOJI: str = "<a:loadingbf2:1387019740513308712>"
 
-INVITE_LINK_TEMPLATE: str = "https://discord.com/oauth2/authorize?client_id={}&permissions=563224831838208&integration_type=0&scope=bot+applications.commands"
+INVITE_LINK_TEMPLATE: str = "https://discord.com/oauth2/authorize?client_id=1383448316292890745"
 GITHUB_LINK: str = "https://github.com/bbombss/BattlefrontLeagueBot"
 TRELLO_LINK: str = "https://bbo.ms/bf2bot"
 

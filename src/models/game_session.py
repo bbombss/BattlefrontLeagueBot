@@ -6,8 +6,10 @@ import asyncio
 import datetime
 import itertools
 import math
+import os
 import typing as t
 from collections import Counter
+from contextlib import suppress
 from io import BytesIO
 from random import randint
 
@@ -415,7 +417,10 @@ class SessionContext:
             inline=True,
         )
         embed.set_footer("Waiting for scores..." if not match.winner else "Session finished")
-        embed.set_image(map)
+        if map is not None:
+            embed.set_image(
+                os.path.join(self.app.base_dir, "src", "static", "img", map.lower().replace(" ", "_") + ".jpg")
+            )
 
         if match.round1_winner:
             if match.round1_scores[0] == match.round1_scores[1]:
@@ -443,13 +448,15 @@ class SessionContext:
 
         return await self.edit_last_response("", embed=embed, components=[])
 
-    async def send_match_summary(self, match: GameMatch) -> None:
+    async def send_match_summary(self, match: GameMatch, session_id: int) -> None:
         """Send a match summary in the context channel.
 
         Parameters
         ----------
         match : GameMatch
             The completed game match.
+        session_id : int
+            The ID of the completed match.
 
         """
         if not match.winner:
@@ -467,7 +474,7 @@ class SessionContext:
         await self.app.rest.create_message(
             self.channel,
             f"Congrats {', '.join([player.member.mention for player in match.winner.players])} for winning "
-            f"{match.final_scores[0]} - {match.final_scores[1]} against their opponents",
+            f"{match.final_scores[0]} - {match.final_scores[1]} against their opponents (*match: {session_id}*)",
             user_mentions=True,
             attachment=hikari.Bytes(b.getvalue(), "banner.jpg"),
         )
@@ -680,7 +687,7 @@ class GameSession:
                     round_index = 0
                     continue
 
-                self._session_manager.remove_session(self.ctx.guild.id)
+                self._session_manager.remove_session(self.ctx.channel.id)
                 return
 
             if vote == 5:  # Skip
@@ -851,7 +858,8 @@ class GameSession:
                 description=f"{FAIL_EMOJI} **Session was ended{' due to a timeout' if timeout else ''}**",
                 colour=FAIL_EMBED_COLOUR,
             )
-            await self.ctx.edit_last_response(embed=embed, components=[])
+            with suppress(hikari.NotFoundError):
+                await self.ctx.edit_last_response(embed=embed, components=[], attachment=None)
             return
 
         self._session_task = None
@@ -928,7 +936,28 @@ class GameSession:
         self._session_task = asyncio.create_task(self._wait_for_scores())
         await asyncio.wait_for(self._session_task, timeout=3610)
 
-        self._session_manager.remove_session(self.ctx.guild.id)
+        self._session_manager.remove_session(self.ctx.channel.id)
+
+        view = RetryView(author=self.ctx.author.id)
+        msg = await self.ctx.edit_last_response(components=view)
+        self.ctx.app.miru_client.start_view(view, bind_to=msg)
+        await view.wait()
+
+        if view.value:
+            if self._session_manager.fetch_session(self.ctx.channel.id):
+                return
+
+            session = GameSession(SessionContext(self.ctx.app, self.ctx.guild, self.ctx.channel, self.ctx.author))
+            new_members = [
+                *[p.member for p in self._match.team1.players],
+                *[p.member for p in self._match.team2.players],
+            ]
+
+            await asyncio.create_task(
+                self.ctx.app.game_session_manager.start_session(
+                    self.ctx.channel.id, session, members=new_members, force=True
+                )
+            )
 
 
 # Copyright (C) 2025 BBombs
