@@ -4,14 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment=" Implement white caps &amp; other improvements (1.1.2)">
+    <list default="true" id="93723480-dd8f-438c-91e6-48baa4125451" name="Changes" comment="Channel based session &amp; fix leaderboard (1.1.3)">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/extensions/admin.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/admin.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/extensions/battlefront.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/extensions/battlefront.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/database_match.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/database_match.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/game_session.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/game_session_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/game_session_manager.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/static/const.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/static/const.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -335,7 +331,15 @@
       <option name="project" value="LOCAL" />
       <updated>1755265807805</updated>
     </task>
-    <option name="localTasksCounter" value="29" />
+    <task id="LOCAL-00029" summary="Channel based session &amp; fix leaderboard (1.1.3)">
+      <option name="closed" value="true" />
+      <created>1755526215973</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1755526215973</updated>
+    </task>
+    <option name="localTasksCounter" value="30" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -352,7 +356,6 @@
   <component name="VcsManagerConfiguration">
     <option name="CHECK_NEW_TODO" value="false" />
     <option name="ADD_EXTERNAL_FILES_SILENTLY" value="true" />
-    <MESSAGE value="Session context updates and structure improvements (Passed)" />
     <MESSAGE value="Game session, game loop complete but very cursed (needs refactor)" />
     <MESSAGE value="Game logic optimisations and fixes" />
     <MESSAGE value="Match voting fixed" />
@@ -377,6 +380,7 @@
     <MESSAGE value="Finalise 1.1.1a" />
     <MESSAGE value="Player rating with openskill (1.1.1b)" />
     <MESSAGE value=" Implement white caps &amp; other improvements (1.1.2)" />
-    <option name="LAST_COMMIT_MESSAGE" value=" Implement white caps &amp; other improvements (1.1.2)" />
+    <MESSAGE value="Channel based session &amp; fix leaderboard (1.1.3)" />
+    <option name="LAST_COMMIT_MESSAGE" value="Channel based session &amp; fix leaderboard (1.1.3)" />
   </component>
 </project>

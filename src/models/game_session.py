@@ -866,7 +866,7 @@ class GameSession:
         await self.ctx.send_round_update(round_no, update_match_stats(), map=self._map)
         await self._save_match()
         await self._handle_ranking()
-        await self.ctx.send_match_summary(self._match)
+        await self.ctx.send_match_summary(self._match, self.id)
 
     def add_score(self, score1: int, score2: int) -> None:
         """Add a score to this session.
@@ -934,7 +934,11 @@ class GameSession:
             await self.ctx.loading()
 
         self._session_task = asyncio.create_task(self._wait_for_scores())
-        await asyncio.wait_for(self._session_task, timeout=3610)
+        try:
+            await asyncio.wait_for(self._session_task, timeout=3610)
+        except TimeoutError:
+            self._session_manager.remove_session(self.ctx.channel.id)
+            return
 
         self._session_manager.remove_session(self.ctx.channel.id)
 

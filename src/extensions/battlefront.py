@@ -280,7 +280,7 @@ async def leaderboard(ctx: BattlefrontBotSlashContext, type: str) -> None:
                 sigma,
                 wins::float / NULLIF(wins + loses + ties, 0) AS win_loss,
                 (mu - 3 * sigma) AS rating
-            FROM members WHERE guildId = $1
+            FROM members WHERE guildId = $1 AND mu IS NOT null
         )
         SELECT userid, wins, win_loss, rating FROM stats
         ORDER BY
@@ -303,7 +303,7 @@ async def leaderboard(ctx: BattlefrontBotSlashContext, type: str) -> None:
     member_stats = {}
     for record, member in zip(records, members):
         if member is None:
-            await ctx.app.rest.fetch_member(ctx.guild_id, record["userid"])
+            member = await ctx.app.rest.fetch_member(ctx.guild_id, record["userid"])
 
         if type == "Wins" and record["wins"] is not None:
             member_stats[member] = record["wins"]
