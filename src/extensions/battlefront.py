@@ -263,7 +263,7 @@ async def career(ctx: BattlefrontBotSlashContext, player: hikari.Member) -> None
 
 
 @battlefront.command
-@lightbulb.add_cooldown(60, 3, lightbulb.buckets.GuildBucket)
+@lightbulb.add_cooldown(60, 4, lightbulb.buckets.GuildBucket)
 @lightbulb.option("type", "Type of leaderboard to get", type=str, required=True, choices=["Wins", "Win/loss", "Ranks"])
 @lightbulb.command("leaderboard", description="Shows the leaderboard for this server", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -370,7 +370,7 @@ def get_random_maps(index: int, amount: int, guild_id: hikari.Snowflake) -> list
 
 
 @battlefront.command
-@lightbulb.add_cooldown(60, 2, lightbulb.buckets.GuildBucket)
+@lightbulb.add_cooldown(60, 4, lightbulb.buckets.GuildBucket)
 @lightbulb.option("index", "Map index, default is 1", type=int, required=False, min_value=1, max_value=3)
 @lightbulb.option("amount", "Amount of random maps to generate", type=int, required=False, min_value=1, max_value=3)
 @lightbulb.option("map3", "Custom map slot 3", type=str, required=False, choices=get_map_choices())
@@ -450,7 +450,7 @@ async def mapvote(
 
 
 @battlefront.command
-@lightbulb.add_cooldown(60, 3, lightbulb.buckets.GuildBucket)
+@lightbulb.add_cooldown(60, 4, lightbulb.buckets.GuildBucket)
 @lightbulb.option("name", "Name of the map", type=str, required=True, choices=[map for map in MAPS if MAPS[map] != 0])
 @lightbulb.command("map", description="Get a map", pass_options=True)
 @lightbulb.implements(lightbulb.SlashCommand)

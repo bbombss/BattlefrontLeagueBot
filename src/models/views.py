@@ -483,7 +483,7 @@ class CapsRegisterView(miru.View):
 
     @miru.button(label="Register", style=hikari.ButtonStyle.PRIMARY)
     async def confirm_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        if ctx.member in self.registered_members:
+        if ctx.member.id in [m.id for m in self.registered_members]:
             await ctx.respond(
                 f"{FAIL_EMOJI} You are already registered for this event", flags=hikari.MessageFlag.EPHEMERAL
             )
@@ -503,7 +503,7 @@ class CapsRegisterView(miru.View):
 
     @miru.button(label="Leave", style=hikari.ButtonStyle.PRIMARY)
     async def leave_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
-        if ctx.member not in self.registered_members:
+        if ctx.member.id not in [m.id for m in self.registered_members]:
             await ctx.respond(f"{FAIL_EMOJI} You are not already registered", flags=hikari.MessageFlag.EPHEMERAL)
             return
 
