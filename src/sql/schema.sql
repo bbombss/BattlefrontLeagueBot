@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS guilds
     rank3Role bigint,
     rank0Role bigint,
     matchPingChannel bigint,
+    adminRole bigint,
     PRIMARY KEY (guildId)
 );
 

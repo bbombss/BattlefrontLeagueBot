@@ -164,6 +164,44 @@ class GameSessionManager:
         session.add_score(score1, score2)
         session.event.set()
 
+    async def add_sub(self, channel_id: hikari.Snowflake, sub: hikari.Member) -> bool:
+        """Add a sub to a session.
+
+        Parameters
+        ----------
+        channel_id : hikari.Snowflake
+            The channel id for the session that is being updated is bound to.
+        sub : hikari.Member
+            The member to add as a sub.
+
+        Returns
+        -------
+        bool
+            Returns True if the player could be added as a sub, else False.
+
+        """
+        session = self.fetch_session(channel_id)
+        return await session.add_sub(sub)
+
+    async def remove_player(self, channel_id, player: hikari.Member) -> bool:
+        """Remove a player from a session and replace them with a sub.
+
+        Parameters
+        ----------
+        channel_id : hikari.Snowflake
+            The channel id for the session that is being updated is bound to.
+        player : hikari.Member
+            The member to remove.
+
+        Returns
+        -------
+        bool
+            Returns True if the player could be removed, else False.
+
+        """
+        session = self.fetch_session(channel_id)
+        return await session.remove_player(player)
+
     def end_session(self, channel_id: hikari.Snowflake) -> None:
         """End an ongoing session.
 

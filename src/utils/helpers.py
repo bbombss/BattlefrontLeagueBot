@@ -10,6 +10,23 @@ if t.TYPE_CHECKING:
     from src.models.context import BattlefrontBotSlashContext
 
 
+async def is_bot_admin(ctx: BattlefrontBotSlashContext) -> bool:
+    """Will return true if the context member has the guilds bot admin role or is a server administrator.
+
+    Parameters
+    ----------
+    ctx : BattlefrontBotSlashContext
+        The context to check, will use the context member for the check.
+
+    """
+    if is_admin(ctx.member):
+        return True
+
+    admin_role = await ctx.app.db.fetchval("""SELECT adminRole FROM guilds WHERE guildId = $1""", ctx.guild_id)
+
+    return admin_role and admin_role in ctx.member.role_ids
+
+
 async def bot_in_channel(ctx: BattlefrontBotSlashContext) -> bool:
     """Will return true if the bot has access to the context channel.
 

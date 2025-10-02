@@ -1,9 +1,13 @@
 import typing as t
 from collections import Counter
+from contextlib import suppress
 
 import hikari
 import lightbulb
 import miru
+
+if t.TYPE_CHECKING:
+    from src.models import BattleFrontBot
 
 from src.static import *
 from src.utils import is_admin
@@ -559,7 +563,8 @@ class RetryView(miru.View):
         if self.message:
             for item in self.children:
                 item.disabled = True
-            await self.message.edit(components=self)
+            with suppress(hikari.NotFoundError):
+                await self.message.edit(components=self)
         self.stop()
 
     @miru.button(emoji="🔄", style=hikari.ButtonStyle.PRIMARY)
@@ -572,6 +577,234 @@ class RetryView(miru.View):
 
         self.value = True
         await self.deactivate()
+        self.stop()
+
+
+# ToDo: Improve this garbage
+class SettingsView(AuthorOnlyView):
+    """View for changing a guilds settings."""
+
+    def __init__(self, lightbulb_ctx: lightbulb.Context, timeout: int = 300):
+        """View for changing a guilds settings.
+
+        Parameters
+        ----------
+        lightbulb_ctx : lightbulb.Context | None
+            The lightbulb context object, if provided makes the view author only.
+        timeout : float
+            Timeout for view, defaults to 300.
+
+        """
+        super().__init__(lightbulb_ctx, timeout=timeout)
+        self.app: BattleFrontBot = self.lightbulb_ctx.app
+
+    async def on_timeout(self) -> None:
+        if self.message:
+            for item in self.children:
+                item.disabled = True
+            with suppress(hikari.NotFoundError):
+                await self.message.edit(components=self)
+        self.stop()
+
+    async def build_embed(self) -> hikari.Embed:
+        """Create a settings page embed."""
+        guild_records = await self.app.db.fetchrow(
+            """SELECT * FROM guilds WHERE guildId = $1""", self.lightbulb_ctx.guild_id
+        )
+        map_records = await self.app.db.fetch(
+            """SELECT * FROM mapBans WHERE guildId = $1""", self.lightbulb_ctx.guild_id
+        )
+
+        admin_role: hikari.PartialRole | None = None
+        match_channel: hikari.PartialChannel | None = None
+        map_bans: str | None = None
+
+        if role_id := guild_records["adminrole"]:
+            admin_role = await self.app.rest.fetch_role(self.lightbulb_ctx.guild_id, role_id)
+
+        if channel_id := guild_records["matchpingchannel"]:
+            match_channel = await self.app.rest.fetch_channel(channel_id)
+
+        if len(map_records) >= 1:
+            map_bans = ", ".join(record["mapname"] for record in map_records)
+
+        embed = hikari.Embed(
+            title="Bot Settings",
+            description=f"**Admin role:** {admin_role.mention if admin_role else 'Not set'}\n"
+            f"**Match ping channel:** {match_channel.mention if match_channel else 'Not set'}\n"
+            f"**Map bans:** {map_bans if map_bans else 'No bans'}",
+            colour=DEFAULT_EMBED_COLOUR,
+        )
+
+        return embed
+
+    @miru.button(label="Manage Admin Role", style=hikari.ButtonStyle.PRIMARY)
+    async def admin_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        adminselector = AdminRoleSelection(self.lightbulb_ctx)
+        msg = await ctx.respond(components=adminselector, flags=hikari.MessageFlag.EPHEMERAL)
+
+        self.app.miru_client.start_view(adminselector, bind_to=msg)
+        await adminselector.wait()
+
+        with suppress(hikari.NotFoundError):
+            await msg.delete()
+
+        await self.message.edit("", embed=await self.build_embed(), components=self)
+
+    @miru.button(label="Manage Caps Ping Channel", style=hikari.ButtonStyle.PRIMARY)
+    async def capsping_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        capsselector = CapsChannelSelection(self.lightbulb_ctx)
+        msg = await ctx.respond(components=capsselector, flags=hikari.MessageFlag.EPHEMERAL)
+
+        self.app.miru_client.start_view(capsselector, bind_to=msg)
+        await capsselector.wait()
+
+        with suppress(hikari.NotFoundError):
+            await msg.delete()
+
+        await self.message.edit("", embed=await self.build_embed(), components=self)
+
+    @miru.button(label="Add Map Ban", style=hikari.ButtonStyle.PRIMARY)
+    async def mapbans_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        mapbansselector = MapBansSelection(self.lightbulb_ctx)
+        msg = await ctx.respond(components=mapbansselector, flags=hikari.MessageFlag.EPHEMERAL)
+
+        self.app.miru_client.start_view(mapbansselector, bind_to=msg)
+        await mapbansselector.wait()
+
+        with suppress(hikari.NotFoundError):
+            await msg.delete()
+
+        await self.message.edit("", embed=await self.build_embed(), components=self)
+
+    @miru.button(label="Remove Map Ban", style=hikari.ButtonStyle.PRIMARY)
+    async def mapunbans_button(self, ctx: miru.ViewContext, button: miru.Button) -> None:
+        map_bans = await self.app.db.fetch("""SELECT * FROM mapBans WHERE guildId = $1""", self.lightbulb_ctx.guild_id)
+
+        mapunbanselector = MapUnbanSelection(self.lightbulb_ctx)
+        options = [miru.SelectOption(map["mapname"], value=map["mapname"]) for map in map_bans]
+        mapunbanselector.get_item_by_id("unbanselector").options = options
+
+        msg = await ctx.respond(components=mapunbanselector, flags=hikari.MessageFlag.EPHEMERAL)
+
+        self.app.miru_client.start_view(mapunbanselector, bind_to=msg)
+        await mapunbanselector.wait()
+
+        with suppress(hikari.NotFoundError):
+            await msg.delete()
+
+        await self.message.edit("", embed=await self.build_embed(), components=self)
+
+
+class AdminRoleSelection(AuthorOnlyView):
+    """View for changing the admin role of the context guild."""
+
+    def __init__(self, lightbulb_ctx: lightbulb.Context, timeout: int = 120):
+        """View for changing the admin role of the context guild.
+
+        Parameters
+        ----------
+        lightbulb_ctx : lightbulb.Context | None
+            The lightbulb context object.
+        timeout : float
+            Timeout for view, defaults to 120.
+
+        """
+        super().__init__(lightbulb_ctx, timeout=timeout)
+        self.app: BattleFrontBot = self.lightbulb_ctx.app
+
+    @miru.role_select(placeholder="Select a new bot admin role", max_values=1)
+    async def role_selector(self, ctx: miru.ViewContext, select: miru.RoleSelect) -> None:
+        role = select.values[0].id
+        await self.app.db.execute("""UPDATE guilds SET adminRole = $1 WHERE guildId = $2""", role, ctx.guild_id)
+
+        self.stop()
+
+
+class CapsChannelSelection(AuthorOnlyView):
+    """View for changing the caps ping channel of the context guild."""
+
+    def __init__(self, lightbulb_ctx: lightbulb.Context, timeout: int = 120):
+        """View for changing the caps ping channel of the context guild.
+
+        Parameters
+        ----------
+        lightbulb_ctx : lightbulb.Context | None
+            The lightbulb context object.
+        timeout : float
+            Timeout for view, defaults to 120.
+
+        """
+        super().__init__(lightbulb_ctx, timeout=timeout)
+        self.app: BattleFrontBot = self.lightbulb_ctx.app
+
+    @miru.channel_select(placeholder="Select a new match ping channel", max_values=1)
+    async def channel_selector(self, ctx: miru.ViewContext, select: miru.ChannelSelect) -> None:
+        channel = select.values[0]
+        await self.app.db.execute(
+            """UPDATE guilds SET matchPingChannel = $1 WHERE guildId = $2""", channel.id, ctx.guild_id
+        )
+
+        self.stop()
+
+
+class MapBansSelection(AuthorOnlyView):
+    """View for adding a map ban to the context guild."""
+
+    def __init__(self, lightbulb_ctx: lightbulb.Context, timeout: int = 120):
+        """View for adding a map ban to the context guild.
+
+        Parameters
+        ----------
+        lightbulb_ctx : lightbulb.Context | None
+            The lightbulb context object.
+        timeout : float
+            Timeout for view, defaults to 120.
+
+        """
+        super().__init__(lightbulb_ctx, timeout=timeout)
+        self.app: BattleFrontBot = self.lightbulb_ctx.app
+
+    @miru.text_select(
+        placeholder="Select a new map to ban", options=[miru.SelectOption(map, value=map) for map in MAPS]
+    )
+    async def mapban_selector(self, ctx: miru.ViewContext, select: miru.ChannelSelect) -> None:
+        await self.app.db.execute(
+            """INSERT INTO mapBans (mapName, guildId) VALUES ($1, $2)""", select.values[0], ctx.guild_id
+        )
+
+        self.stop()
+
+
+class MapUnbanSelection(AuthorOnlyView):
+    """View for adding a map ban to the context guild."""
+
+    def __init__(self, lightbulb_ctx: lightbulb.Context, timeout: int = 120):
+        """View for adding a map ban to the context guild.
+
+        Parameters
+        ----------
+        lightbulb_ctx : lightbulb.Context
+            The lightbulb context object.
+        timeout : float
+            Timeout for view, defaults to 120.
+
+        """
+        super().__init__(lightbulb_ctx, timeout=timeout)
+        self.app: BattleFrontBot = self.lightbulb_ctx.app
+
+    @miru.text_select(
+        placeholder="Select a map to unban",
+        options=[
+            miru.SelectOption("Loading", value="Loading"),
+        ],
+        custom_id="unbanselector",
+    )
+    async def unban_selector(self, ctx: miru.ViewContext, select: miru.ChannelSelect) -> None:
+        await self.app.db.execute(
+            """DELETE FROM mapBans WHERE guildId = $1 AND mapName = $2""", ctx.guild_id, select.values[0]
+        )
+
         self.stop()
 
 

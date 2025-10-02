@@ -111,6 +111,7 @@ class GameMatch:
         """
         self.team1 = team1
         self.team2 = team2
+        self.subs: list[GamePlayer] = []
 
         self.round1_winner: GameTeam | None = None
         self.round2_winner: GameTeam | None = None
@@ -446,6 +447,9 @@ class SessionContext:
                 inline=False,
             )
 
+        if len(match.subs) > 0 and not match.winner:
+            embed.add_field(name="Subs", value=", ".join(player.name for player in match.subs))
+
         return await self.edit_last_response("", embed=embed, components=[])
 
     async def send_match_summary(self, match: GameMatch, session_id: int) -> None:
@@ -471,8 +475,14 @@ class SessionContext:
             [player.name for player in match.winner.players],
         )
 
+        caps_ping_channel = await self.app.db.fetchval(
+            """SELECT matchPingChannel FROM guilds WHERE guildId = $1""", self.guild.id
+        )
+        if caps_ping_channel is None:
+            caps_ping_channel = self.channel
+
         await self.app.rest.create_message(
-            self.channel,
+            caps_ping_channel,
             f"Congrats {', '.join([player.member.mention for player in match.winner.players])} for winning "
             f"{match.final_scores[0]} - {match.final_scores[1]} against their opponents (*match: {session_id}*)",
             user_mentions=True,
@@ -502,6 +512,7 @@ class GameSession:
         self._match: GameMatch
         self._event = asyncio.Event()
         self._map: str | None = None
+        self._round_no: int = 1
 
     @property
     def ctx(self) -> SessionContext:
@@ -710,6 +721,10 @@ class GameSession:
         model = self._session_manager.openskill_model
         tied = self._match.final_scores[0] == self._match.final_scores[1]
 
+        avg_role_rank = round(sum(player.role for player in self.players) / len(self.players))
+        avg_ord = sum(player.mu - 3 * player.sigma for player in self.players) / len(self.players)
+        excluded_players = []
+
         winners, losers = [], []
         for member in self._match.winner.players:
             winners.append(model.rating(member.mu, member.sigma, str(member.member.id)))
@@ -720,6 +735,16 @@ class GameSession:
 
         async with self.ctx.app.db.pool.acquire() as con:
             for i in range(0, len(winners)):
+                player = self._match.winner.players[i]
+
+                if not abs(player.role - avg_role_rank) <= 1:
+                    excluded_players.append(player.name)
+                    continue
+
+                if not abs(winners[i].ordinal() - avg_ord) <= 3:
+                    excluded_players.append(player.name)
+                    continue
+
                 await con.execute(
                     """UPDATE members SET mu = $1, sigma = $2 WHERE userId = $3 AND guildId = $4""",
                     winners[i].mu,
@@ -741,12 +766,21 @@ class GameSession:
                     winners[i].sigma,
                 )
 
-                player = self._match.winner.players[i]
                 player.mu = winners[i].mu
                 player.sigma = winners[i].sigma
                 self._session_manager.player_cache.set(player.member.id, player)
 
             for i in range(0, len(losers)):
+                player = self._match.loser.players[i]
+
+                if not abs(player.role - avg_role_rank) <= 1:
+                    excluded_players.append(player.name)
+                    continue
+
+                if not abs(losers[i].ordinal() - avg_ord) <= 3:
+                    excluded_players.append(player.name)
+                    continue
+
                 await con.execute(
                     """UPDATE members SET mu = $1, sigma = $2 WHERE userId = $3 AND guildId = $4""",
                     losers[i].mu,
@@ -768,10 +802,14 @@ class GameSession:
                     losers[i].sigma,
                 )
 
-                player = self._match.loser.players[i]
                 player.mu = losers[i].mu
                 player.sigma = losers[i].sigma
                 self._session_manager.player_cache.set(player.member.id, player)
+
+        await self.ctx.warn(
+            f"Some players were excluded from rank adjustments due to their skill gap "
+            f"**({', '.join(excluded_players)})**"
+        )
 
     async def _save_match(self) -> None:
         """Persist the match associated with this session in the database."""
@@ -814,11 +852,11 @@ class GameSession:
         Can be stopped by clearing session task.
         """
         total_scores = [0, 0]
-        round_no: int = 1
+
         timeout: bool = False
 
         def update_match_stats() -> GameMatch:
-            if round_no == 1:
+            if self._round_no == 1:
                 return self._match
 
             score1, score2 = self._latest_score
@@ -826,10 +864,10 @@ class GameSession:
 
             total_scores[0] += score1
             total_scores[1] += score2
-            setattr(self._match, f"round{round_no - 1}_scores", (score1, score2))
-            setattr(self._match, f"round{round_no - 1}_winner", winner)
+            setattr(self._match, f"round{self._round_no - 1}_scores", (score1, score2))
+            setattr(self._match, f"round{self._round_no - 1}_winner", winner)
 
-            if round_no == 3:
+            if self._round_no == 3:
                 self._match.winner = self._match.team1 if total_scores[0] > total_scores[1] else self._match.team2
                 self._match.loser = self._match.team1 if total_scores[0] < total_scores[1] else self._match.team2
                 self._match.final_scores = (total_scores[0], total_scores[1])
@@ -841,8 +879,8 @@ class GameSession:
             return self._match
 
         # Update loop for scores
-        while self.session_task and round_no < 3:
-            await self.ctx.send_round_update(round_no, update_match_stats(), map=self._map)
+        while self.session_task and self._round_no < 3:
+            await self.ctx.send_round_update(self._round_no, update_match_stats(), map=self._map)
 
             try:
                 self.event.clear()
@@ -851,7 +889,7 @@ class GameSession:
                 timeout = True
                 break
 
-            round_no += 1
+            self._round_no += 1
 
         if sum(total_scores) == 0 or not self.session_task:
             embed = hikari.Embed(
@@ -863,9 +901,12 @@ class GameSession:
             return
 
         self._session_task = None
-        await self.ctx.send_round_update(round_no, update_match_stats(), map=self._map)
+        await self.ctx.send_round_update(self._round_no, update_match_stats(), map=self._map)
         await self._save_match()
+
+        self._players = self._match.winner.players + self._match.loser.players
         await self._handle_ranking()
+
         await self.ctx.send_match_summary(self._match, self.id)
 
     def add_score(self, score1: int, score2: int) -> None:
@@ -895,6 +936,69 @@ class GameSession:
 
         """
         self._map = map
+
+    async def add_sub(self, sub: hikari.Member) -> bool:
+        """Add a sub player to this sessions match.
+
+        Parameters
+        ----------
+        sub : hikari.Member
+            The member to add, a player object will be fetched for this member.
+
+        Returns
+        -------
+        bool
+            Returns True if the player could be added as a sub, else False.
+
+        """
+        if not self.session_task:
+            raise GameSessionError("Session is not ready to receive subs")
+
+        if sub.id in [player.member.id for player in self.players]:
+            return False
+
+        if sub.id in [player.member.id for player in self._match.subs]:
+            return False
+
+        self._match.subs.append(await self._get_player_object(sub))
+        await self.ctx.send_round_update(self._round_no, self._match, map=self._map)
+        return True
+
+    async def remove_player(self, member: hikari.Member) -> bool:
+        """Remove a player from this sessions match.
+
+        Parameters
+        ----------
+        member : hikari.Member
+            The member to remove, a player object will be fetched for this member.
+
+        Returns
+        -------
+        bool
+            Returns True if the player could be removed, else False.
+
+        """
+        if not self.session_task:
+            raise GameSessionError("Cannot remove player from non existent match")
+
+        if len(self._match.subs) < 1:
+            return False
+
+        for player in self._match.team1.players:
+            if player.member.id == member.id:
+                self._match.team1.players.remove(player)
+                self._match.team1.players.append(self._match.subs.pop(0))
+                await self.ctx.send_round_update(self._round_no, self._match, map=self._map)
+                return True
+
+        for player in self._match.team2.players:
+            if player.member.id == member.id:
+                self._match.team2.players.remove(player)
+                self._match.team2.players.append(self._match.subs.pop(0))
+                await self.ctx.send_round_update(self._round_no, self._match, map=self._map)
+                return True
+
+        return False
 
     def end(self) -> None:
         """End the game loop."""

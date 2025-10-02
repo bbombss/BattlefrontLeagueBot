@@ -7,9 +7,12 @@ __all__ = [
     "LOADING_EMOJI",
     "SUCCESS_EMBED_COLOUR",
     "SUCCESS_EMOJI",
+    "TIMEZONE",
     "TRELLO_LINK",
     "WARN_EMBED_COLOUR",
 ]
+
+import datetime
 
 import hikari
 
@@ -26,6 +29,7 @@ INVITE_LINK_TEMPLATE: str = "https://discord.com/oauth2/authorize?client_id=1383
 GITHUB_LINK: str = "https://github.com/bbombss/BattlefrontLeagueBot"
 TRELLO_LINK: str = "https://bbo.ms/bf2bot"
 
+TIMEZONE: datetime.timezone = datetime.timezone(datetime.timedelta(hours=10))
 
 # Copyright (C) 2025 BBombs
 

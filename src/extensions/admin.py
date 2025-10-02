@@ -175,7 +175,8 @@ async def changelog(ctx: BattlefrontBotPrefixContext, description: str, link: st
 
     if confirmation:
         for guild in ctx.app.cache.get_guilds_view().values():
-            await ctx.app.rest.create_message(guild.system_channel_id, embed=embed, component=component)
+            if guild.system_channel_id:
+                await ctx.app.rest.create_message(guild.system_channel_id, embed=embed, component=component)
 
         await ctx.respond_with_success("**Changelog Sent**", edit=True)
 
